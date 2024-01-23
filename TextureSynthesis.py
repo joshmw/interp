@@ -12,7 +12,7 @@ import pdb
 from VGG19 import *
 
 SAVE_STEP = 1000
-PRINT_STEP = 200
+PRINT_STEP = 50
 
 class TextureSynthesis:
     def __init__(self, model, original_image, original_image2, interp, layer_weights, nSplits, layer_name='', image_name='', image_name2='', saveDir='.', iterations=1000):
@@ -74,10 +74,27 @@ class TextureSynthesis:
 
         # Get gramian
         start_time = time.time()
+        self.interp_activations = dict()
         self.gramian = self._get_gramian(interp) # {layer_name: activations}
         elapsed_time = time.time() - start_time
         print('Getting gramian took {:.3f} seconds'.format(elapsed_time))
 
+    def get_activation_loss(self):
+        total_loss = 0.0
+        for layer in self.layer_weights.keys():
+            print(layer)
+            layer_activations = self.model_layers[layer]
+            layer_activations_shape = layer_activations.get_shape().as_list()
+            assert len(layer_activations_shape) == 4 # (1, H, W, outputs)
+            assert layer_activations_shape[0] == 1, "Only supports 1 image at a time."
+            num_filters = layer_activations_shape[3] # N
+            num_spatial_locations = layer_activations_shape[1] * layer_activations_shape[2] # M
+            desired_layer_activations = self.interp_activations[layer]
+
+            total_loss += self.layer_weights[layer] * (1.0 / (4 * (num_filters**2) * (num_spatial_locations**2))) \
+                          * tf.reduce_sum(tf.pow(desired_layer_activations - layer_activations, 2))
+
+        return total_loss
 
     def get_texture_loss(self):
         total_loss = 0.0
@@ -143,24 +160,25 @@ class TextureSynthesis:
 
             #first image gramian
             self.sess.run(self.model_layers['input'].assign(original_image))
-            layer_activations = self.sess.run(self.model_layers[layer])
-            num_filters = layer_activations.shape[3] # N
-            num_spatial_locations = layer_activations.shape[1] * layer_activations.shape[2] # M
-            #print layer_activations.shape
-            gramian1[layer] = self._compute_weighted_gram_matrix_np(layer, layer_activations, num_filters, num_spatial_locations)
+            activations1 = self.sess.run(self.model_layers[layer])
+            num_filters = activations1.shape[3] # N
+            num_spatial_locations = activations1.shape[1] * activations1.shape[2] # M
+            #print activations1.shape
+            gramian1[layer] = self._compute_weighted_gram_matrix_np(layer, activations1, num_filters, num_spatial_locations)
             
             #second image gramian
             self.sess.run(self.model_layers['input'].assign(original_image2))
-            layer_activations = self.sess.run(self.model_layers[layer])
-            num_filters = layer_activations.shape[3] # N
-            num_spatial_locations = layer_activations.shape[1] * layer_activations.shape[2] # M
+            activations2 = self.sess.run(self.model_layers[layer])
+            num_filters = activations2.shape[3] # N
+            num_spatial_locations = activations2.shape[1] * activations2.shape[2] # M
             #print layer_activations.shape
-            gramian2[layer] = self._compute_weighted_gram_matrix_np(layer, layer_activations, num_filters, num_spatial_locations)
+            gramian2[layer] = self._compute_weighted_gram_matrix_np(layer, activations2, num_filters, num_spatial_locations)
 
 
             gramianDif[layer] = gramian2[layer] - gramian1[layer]
             
             gramian[layer] = gramian1[layer] + interp * gramianDif[layer]
+            self.interp_activations[layer] = activations1 + interp * (activations2 - activations1)
 
             interpNum += 1
                                               
@@ -214,7 +232,7 @@ class TextureSynthesis:
         F2 = tf.to_float(tf.constant(np.zeros(N*N), shape=(N, N, 1)));
         F = tf.reshape(F, (M, N))
         weight_mtx = self.layer_subset_weights[layer]
-        pdb.set_trace()
+        # pdb.set_trace()
 
         for si in range(len(self.subset_boundaries)):
             subset_weights = tf.to_float(tf.reshape(weight_mtx[:,:,si], (M,1)))
@@ -286,24 +304,28 @@ class TextureSynthesis:
         self.sess.run(tf.initialize_all_variables())
         self.sess.run(self.model_layers["input"].assign(self.original_image))
 
-        content_loss = self.get_texture_loss()
+        activation_loss = self.get_activation_loss()
+        # content_loss = self.get_texture_loss()
         spectral_loss = self.get_spectral_loss()
         luminancehistogram_loss = self.get_luminancehistogram_loss()
         optimizer = tf.train.AdamOptimizer(2.0)
         #train_step = optimizer.minimize(content_loss)
-        if loss == 'texture':
+        if loss == 'activation':
+          print('Using activation loss')
+          train_step = optimizer.minimize(activation_loss)
+        elif loss == 'texture':
           print('Using texture loss')
-          train_step = optimizer.minimize(content_loss)
+        #   train_step = optimizer.minimize(content_loss)
         elif loss == 'spectral':
           print('Using both spectral and texture loss')
-          train_step = optimizer.minimize(spectral_weight*spectral_loss + content_loss)
+        #   train_step = optimizer.minimize(spectral_weight*spectral_loss + content_loss)
         elif loss == 'luminancehistogram':
           print('Using both texture and luminance histogram (mean/var) loss')
-          train_step = optimizer.minimize(content_loss + luminancehistogram_loss)
+        #   train_step = optimizer.minimize(content_loss + luminancehistogram_loss)
         else:
           print('Using all 3 of : spectral, luminance mean/var, and texture loss')
           #print(spectral_loss.dtype, content_loss.dtype)
-          train_step = optimizer.minimize(spectral_weight*spectral_loss + luminancehistogram_loss + content_loss)
+        #   train_step = optimizer.minimize(spectral_weight*spectral_loss + luminancehistogram_loss + content_loss)
 
         self.init_image = self._gen_noise_image()
 
@@ -314,7 +336,9 @@ class TextureSynthesis:
         for i in range(self.iterations):
             self.sess.run(train_step)
             if i % PRINT_STEP == 0:
-              print('Iteration: {}; Texture Loss: {:.1f}; Spectral Loss: {:.3e}; Luminance Histogram Loss: {:.3e}'.format(i, self.sess.run(content_loss), self.sess.run(spectral_loss), self.sess.run(luminancehistogram_loss)))
+            #   print('Iteration: {}; Texture Loss: {:.1f}; Spectral Loss: {:.3e}; Luminance Histogram Loss: {:.3e}'.format(i, self.sess.run(content_loss), self.sess.run(spectral_loss), self.sess.run(luminancehistogram_loss)))
+              print('Iteration: {}; Activation Loss: {:.1f}; Spectral Loss: {:.3e}; Luminance Histogram Loss: {:.3e}'.format(i, self.sess.run(activation_loss), self.sess.run(spectral_loss), self.sess.run(luminancehistogram_loss)))
+                # print('Iteration: {}'.format(i))
             if i % SAVE_STEP == 0:
                 print("Saving image...")
                 curr_img = self.sess.run(self.model_layers["input"])
