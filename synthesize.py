@@ -30,9 +30,12 @@ def main(args):
     vgg19.build_model()
 
     # Weights for each layer
-    all_layers = ['conv1_1', 'pool1', 'pool2', 'pool3', 'pool4', 'pool5']
-    assert args.layer in all_layers, 'Specified layer must be in {}'.format(all_layers)
-    layer_weight = {x: 1e9 for x in all_layers[:all_layers.index(args.layer)+1]}
+    #all_layers = ['conv1_1', 'pool1', 'pool2', 'pool3', 'pool4', 'pool5']
+    #assert args.layer in all_layers, 'Specified layer must be in {}'.format(all_layers)
+    #layer_idx = all_layers.index(args.layer)
+    #layer_weight = {x: 1e9 for x in all_layers[:layer_idx+1]}
+    all_layers = ['pool4']
+    layer_weight = {x: 1e9 for x in all_layers}
 
     # Load up original image
     image_path = args.imagepath #'{}/{}.jpg'.format(args.inputdir, args.image)
