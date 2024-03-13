@@ -26,6 +26,6 @@ image_pairs = [
 
 for image1, image2 in image_pairs:
     for interp in interps:
-        command = ["python", "synthesize.py", "-t", str(interp), "-k", "texture", "-i", image1, "-j", image2, "-o", "out/texture_pool4"]
+        command = ["python", "synthesize.py", "-t", str(interp), "-k", "texture", "-i", image1, "-j", image2, "-o", "out/texture_pool1-4"]
         subprocess.run(command)
 

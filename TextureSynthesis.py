@@ -305,7 +305,7 @@ class TextureSynthesis:
         self.sess.run(self.model_layers["input"].assign(self.original_image))
 
         activation_loss = self.get_activation_loss()
-        # content_loss = self.get_texture_loss()
+        content_loss = self.get_texture_loss()
         spectral_loss = self.get_spectral_loss()
         luminancehistogram_loss = self.get_luminancehistogram_loss()
         optimizer = tf.train.AdamOptimizer(2.0)
@@ -315,17 +315,17 @@ class TextureSynthesis:
           train_step = optimizer.minimize(activation_loss)
         elif loss == 'texture':
           print('Using texture loss')
-        #   train_step = optimizer.minimize(content_loss)
+          train_step = optimizer.minimize(content_loss)
         elif loss == 'spectral':
           print('Using both spectral and texture loss')
-        #   train_step = optimizer.minimize(spectral_weight*spectral_loss + content_loss)
+          train_step = optimizer.minimize(spectral_weight*spectral_loss + content_loss)
         elif loss == 'luminancehistogram':
           print('Using both texture and luminance histogram (mean/var) loss')
-        #   train_step = optimizer.minimize(content_loss + luminancehistogram_loss)
+          train_step = optimizer.minimize(content_loss + luminancehistogram_loss)
         else:
           print('Using all 3 of : spectral, luminance mean/var, and texture loss')
           #print(spectral_loss.dtype, content_loss.dtype)
-        #   train_step = optimizer.minimize(spectral_weight*spectral_loss + luminancehistogram_loss + content_loss)
+          train_step = optimizer.minimize(spectral_weight*spectral_loss + luminancehistogram_loss + content_loss)
 
         self.init_image = self._gen_noise_image()
 
@@ -336,8 +336,8 @@ class TextureSynthesis:
         for i in range(self.iterations):
             self.sess.run(train_step)
             if i % PRINT_STEP == 0:
-            #   print('Iteration: {}; Texture Loss: {:.1f}; Spectral Loss: {:.3e}; Luminance Histogram Loss: {:.3e}'.format(i, self.sess.run(content_loss), self.sess.run(spectral_loss), self.sess.run(luminancehistogram_loss)))
-              print('Iteration: {}; Activation Loss: {:.1f}; Spectral Loss: {:.3e}; Luminance Histogram Loss: {:.3e}'.format(i, self.sess.run(activation_loss), self.sess.run(spectral_loss), self.sess.run(luminancehistogram_loss)))
+              print('Iteration: {}; Texture Loss: {:.1f}; Spectral Loss: {:.3e}; Luminance Histogram Loss: {:.3e}'.format(i, self.sess.run(content_loss), self.sess.run(spectral_loss), self.sess.run(luminancehistogram_loss)))
+              # print('Iteration: {}; Activation Loss: {:.1f}; Spectral Loss: {:.3e}; Luminance Histogram Loss: {:.3e}'.format(i, self.sess.run(activation_loss), self.sess.run(spectral_loss), self.sess.run(luminancehistogram_loss)))
                 # print('Iteration: {}'.format(i))
             if i % SAVE_STEP == 0:
                 print("Saving image...")

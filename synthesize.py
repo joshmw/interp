@@ -34,7 +34,7 @@ def main(args):
     #assert args.layer in all_layers, 'Specified layer must be in {}'.format(all_layers)
     #layer_idx = all_layers.index(args.layer)
     #layer_weight = {x: 1e9 for x in all_layers[:layer_idx+1]}
-    all_layers = ['pool4']
+    all_layers = ['pool1', 'pool2', 'pool3', 'pool4']
     layer_weight = {x: 1e9 for x in all_layers}
 
     # Load up original image
