@@ -1,4 +1,4 @@
-function category_texture_analysis(varargin)
+function interp_mriAnal(varargin)
 % category_texture_analysis.m
 %
 %  Takes the outputs of 'run_glmDenoise.m' (results) and does analyses.
@@ -9,101 +9,192 @@ function category_texture_analysis(varargin)
 %
 
 %get args
-getArgs(varargin, {'reliability_cutoff=0'});
+getArgs(varargin, {'reliability_cutoff=0.4', 'r2cutoff=0'});
 %set inclusion criteria from floc %% TO DO
 
 
 %% Load the data
 
-% Task 1 is right visual field  so LEFT hemisphere roi's should be
-% responsive
-% Task 2 is LEFT visual field, so RIGHT hemisphere roi's shold be
-% responsive
+% Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
+% Task 2 is LEFT visual field, so RIGHT HEMISPHERE roi's shold be responsive
 
-taskNum = 1;
-sid = 's0811';
+%load the data
+load('s625RRTask1.mat');
 
-%read in data
-if taskNum == 2;
-    ffa = 1; pha =4;
-elseif taskNum == 1;
-    ffa = 5; pha = 8;
+%get some things you need
+model = models.FIT_HRF_GLMdenoise_RR;
+r2 = glmR2_FIT_HRF_GLMdenoise_RR;
+
+%fix the stim names thing - remove the duplicate of the blanks
+if length(stimNames) == 14; stimNames(8) = [];stimNames(1) = []; end
+
+
+%% calculate the reliability
+betas = squeeze(squeeze(model.modelmd));
+for boot = 1:1000
+    condition_amps = {};
+    split1_amps = {};
+    split2_amps = {};
+    %
+    for cond = 1:12;%1:length(stimNames);
+        condition_amps{cond} = betas(:,trial_conditions==cond);
+        nTrials = size(condition_amps{cond},2);
+    
+        trialorder = randperm(nTrials);
+        split1_amps{end+1} = condition_amps{cond}(:,trialorder(1:floor(nTrials/2)));
+        split2_amps{end+1} = condition_amps{cond}(:,trialorder((floor(nTrials/2)+1):end));
+    end
+    
+    s1a = cellfun(@(x) mean(x,2), split1_amps, 'un', 0);
+    s2a = cellfun(@(x) mean(x,2), split2_amps, 'un', 0);
+    
+    s1a = cat(2, s1a{:});
+    s2a = cat(2, s2a{:});
+
+    reliability(:,boot) = diag(corr(s1a', s2a'));
+
 end
-fileName = strcat('~/data/francesca/', sid, 'Task', num2str(taskNum), '.mat')
-load(fileName);
-    %TO DO - change to input variable
+
+reliability = mean(reliability,2);
 
 
-%% Average together the same stimulus presentations
-nPresentations = length(trial_conditions);
+%% Average together the same stimulus presentations, partition by ROI and get rid of voxels under reliability cutoff
 
+%get the individual trial betas
+amplitudes = squeeze(model.modelmd);
+
+%average together trials that were of the same stim type
 for stim = 1:length(stimNames)
-    
-    %average together the trials that were of that stim type
-    averaged_amplitudes(:,stim) = mean(amplitudes(:,(trial_conditions == stim)),2);
-    
+    averaged_amplitudes(:,stim) = nanmean(amplitudes(:,(trial_conditions == stim)),2);
 end
 
-%save new trial conds now we've ordered and averaged trial conditions
-averaged_trial_conditions = 1:72;
-
-
-%% reliability check
-for roiNum = 1:length(roiNames)
-    reliability_by_roi{roiNum} = reliability_FIT_HRF_GLMdenoise_RR(whichROI== roiNum);
-end
-
-figure;
-plot(1:length(roiNames), cellfun(@median, reliability_by_roi), 'o'); hold on;
-%plot(1:length(roiNames), errorbar2(1:le))
-errorbar2(1:length(roiNames), cellfun(@median, reliability_by_roi), cellfun(@(x) 1.96*std(x)/sqrt(length(x)),reliability_by_roi), 'y');
-hline(0, ':k');
-xticks(1:16)
-xticklabels(roiNames)
-
-ylabel('Split half reliability')
-title('Split half reliability by ROI')
-
-
-%% get the data into a workable format partitioned by ROI
+% partition by roi and filter by voxel reliability
 for roi = 1:length(roiNames);
     %face responses
-    faceResponses = averaged_amplitudes((whichROI == roi)' & reliability_FIT_HRF_GLMdenoise_RR > reliability_cutoff, stimValues(1,:)<=12 & stimValues(2,:) == -1);
-    averageFaceResponse{roi} = nanmedian(faceResponses,"all");
-    allFaceResponses{roi} = faceResponses;
-    allFaceResponsesSTE{roi} = std(faceResponses(:))/sqrt(length(faceResponses(:)));
-    %place responses
-    houseResponses = averaged_amplitudes((whichROI == roi)' & reliability_FIT_HRF_GLMdenoise_RR > reliability_cutoff, stimValues(1,:)>12 & stimValues(2,:) == -1);
-    averageHouseResponse{roi} = nanmedian(houseResponses,"all");
-    allHouseResponses{roi} = houseResponses;
-    allHouseResponsesSTE{roi} = std(houseResponses(:))/sqrt(length(houseResponses(:)));
-    %scrambled faces
-    faceScrambles = averaged_amplitudes((whichROI == roi)' & reliability_FIT_HRF_GLMdenoise_RR > reliability_cutoff, stimValues(1,:)<=12 & stimValues(2,:) ~= -1);
-    averageFaceScramble{roi} = nanmedian(faceScrambles,"all");
-    allFaceScrambles{roi} = faceScrambles;
-    allFaceScramblesSTE{roi} = std(faceScrambles(:))/sqrt(length(faceScrambles(:)));
-    %scrambled houses
-    houseScrambles = averaged_amplitudes((whichROI == roi)' & reliability_FIT_HRF_GLMdenoise_RR > reliability_cutoff, stimValues(1,:)>12 & stimValues(2,:) ~= -1);
-    averageHouseScramble{roi} = nanmedian(houseScrambles,"all");
-    allHouseScrambles{roi} = houseScrambles;
-    allHouseScramblesSTE{roi} = std(houseScrambles(:))/sqrt(length(houseScrambles(:)));
+    averagedBetas{roi} = averaged_amplitudes((whichROI == roi)' & (reliability > reliability_cutoff) & (glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),:);
 end
 
 
-%% plot ROI-level differences in response as a sanity check
-figure, hold on
-plot(1:length(roiNames),cell2mat(averageFaceResponse), 'o', 'Color', 'k', 'MarkerFaceColor', 'k');
-plot(1:length(roiNames),cell2mat(averageHouseResponse), 'o', 'Color', 'r',  'MarkerFaceColor', 'r');
-plot(1:length(roiNames),cell2mat(averageFaceScramble),  'o', 'Color', 'k');
-plot(1:length(roiNames),cell2mat(averageHouseScramble), 'o', 'Color', 'r');
+%% plot split half reliability and R2 by ROI
+
+%plot all the reliabilities with the average
+figure, subplot(3,1,1), hold on
+for roi = 1:length(roiNames)
+    scatter(repmat(roi,sum(whichROI==roi),1), reliability(whichROI==roi),'k','filled','MarkerFaceAlpha',.05)
+    scatter(roi, median(reliability(whichROI==roi)),72,'k','filled','MarkerEdgeColor','w')
+end
 
 %label
-hline(0, ':k');
-legend({'Face', 'House', 'Face Synth', 'House Synth'});
+hline(0,':k')
 xticks(1:16)
 xticklabels(roiNames)
-ylabel('Average % BOLD response to category')
-title('BOLD responses to faces and houses in different ROIs')
+xlabel('ROI name'), ylabel('Voxel reliability')
+ylim([-.5 .5])
+title('Correlation between first half and second half Betas')
+
+%plot the R2 with the average
+subplot(3,1,2), hold on
+for roi = 1:length(roiNames)
+    scatter(repmat(roi,sum(whichROI==roi),1), r2(whichROI==roi),'k','filled','MarkerFaceAlpha',.05)
+    scatter(roi, median(r2(whichROI==roi)),72,'k','filled','MarkerEdgeColor','w')
+end
+
+xticks(1:16)
+xticklabels(roiNames)
+xlabel('ROI name'), ylabel('Voxel R-squared')
+ylim([-40 40])
+hline(0,':k')
+title('R-Squared of voxels')
+
+%plot the betas for each ROI
+subplot(3,1,3), hold on
+for roi = 1:length(roiNames)
+    scatter(repmat(roi,length(averagedBetas{roi}(:)),1)', averagedBetas{roi}(:),'k','filled','MarkerFaceAlpha',.01)
+    scatter(roi, median(median(averagedBetas{roi})),72,'k','filled','MarkerEdgeColor','w')
+end
+
+xticks(1:16)
+xticklabels(roiNames)
+xlabel('ROI name'), ylabel('Beta Amplitude')
+ylim([-2 2])
+hline(0,':k')
+title('Beta weights')
+
+
+%% distance matrices
+
+diffMatrices = {};
+
+for roi = 1:length(roiNames)
+    for im1 = 1:12
+        for im2 = 1:12
+            diffMatrices{roi}(im1,im2) = sum(abs(averagedBetas{roi}(:,im1) - averagedBetas{roi}(:,im2)));
+        end
+    end
+end
+
+%plot
+figure, for i  = 1:16, subplot(4,4,i), imagesc(diffMatrices{i}),end  
+
+
+%% look at multidimensional scaling of individual trials
+for roi = 1:length(roiNames);
+    for condition = 1:12;
+    %get betas for individual trials, filtering by reliability
+        allBetas{roi}{condition} = betas((whichROI == roi)' & (reliability > reliability_cutoff) & (glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),trial_conditions==condition);
+    end
+end
+
+%iterate through rois
+figure
+split = 0;
+
+task1rois = [1:2:16];
+task2rois = [2:2:16];
+
+for sub = 1:16;
+
+    % get the individual trials and reduce dimensions
+    singleTrials = cat(2, allBetas{sub}{[1 6 7 12]});
+    [y stress] = mdscale(pdist(singleTrials'),2);
+
+    % plot the individual trials in different colors
+    subplot(4,4,sub), hold on
+    scatter(y(1:40,1),y(1:40,2),'k','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
+    scatter(y(41:80,1),y(41:80,2),'r','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
+    scatter(y(81:120,1),y(81:120,2),'g','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
+    scatter(y(121:160,1),y(121:160,2),'b','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
+    
+    %label
+    title(roiNames(sub))
+    xlabel('Dimension 1')
+    ylabel('Dimension 2')
+    legend('Lemons','Bananas','Grass','Leaves')
+
+end
+
+
+
+
+keyboard
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 %%% Next steps for analyses:
 % 1. Category "sensitivity" index: Calculate magnitude difference of each
