@@ -1,24 +1,20 @@
 function interp_mriAnal(varargin)
-% category_texture_analysis.m
+% interp_mriAnal.m
 %
-%  Takes the outputs of 'run_glmDenoise.m' (results) and does analyses.
+%  Takes the outputs of 'run_glmDenoiseInterp.m' (results) and does analyses.
 %
-%  Usage: category_texture_analysis(varargin)
-%  Authors: Josh+Francesca+Akshay
+%  Usage: interp_mriAnal(varargin)
+%  Authors: Josh wilson
 %  Date: 04/16/2024
 %
 
-%get args
-getArgs(varargin, {'reliability_cutoff=.6', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=0', 'numBoots=100'});
-%set inclusion criteria from floc %% TO DO
-
-
 
 %% Load the data
+%get args
+getArgs(varargin, {'reliability_cutoff=.65', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=0', 'numBoots=100', 'showAvgMDS=0', 'showDistancesSingleTrials=0'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE roi's shold be responsive
-
 %load the data
 cd('~/data/NEPR207/s625/s62520240429/')
 task{1} = load('s0625Task1ManyROIs.mat');
@@ -29,13 +25,13 @@ for taskNum = 1:2,
     if length(task{taskNum}.stimNames) == 14; task{taskNum}.stimNames(8) = [];task{taskNum}.stimNames(1) = []; end
 end
 
-%swap the roiNums for task 2
+%swap the roiNums for task 2 so that we can do both hemispheres together
 odds = mod(task{2}.whichROI,2) == 1;
 evens = ~odds;
 task{2}.whichROI(evens) = task{2}.whichROI(evens) - 1;
 task{2}.whichROI(odds) = task{2}.whichROI(odds) + 1;
 
-%shuffle the data if you want to.
+%shuffle the data if you want to - this is a flag you can set for control analyses. randomizes the category labels of all the stimuli
 if shuffleData
     task{1}.trial_conditions = task{1}.trial_conditions(randperm(length(task{1}.trial_conditions)));
     task{2}.trial_conditions = task{2}.trial_conditions(randperm(length(task{2}.trial_conditions)));
@@ -52,7 +48,7 @@ for roi = 1:length(roiNames),
 end
 
 
-%% calculate the reliability
+%% calculate the reliability of individual voxels (consistancy of beta values across presentations)
 for taskNum = 1:2;
     task{taskNum}.betas = squeeze(squeeze(task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd));
     for boot = 1:numBoots
@@ -267,19 +263,21 @@ colors = {'g','g','g','g','g','g',[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],
 endpointNames = {'Grass', 'Leaves', 'Lemons', 'Bananas'};
 
 %plot the correlations OF ALL 40 REPEATS with the other 40 repeats from the endpoint conditions
-figure
-for endpoint = 1:length(endpointIndices)
-    subplot(2,2,endpoint), hold on
-    for interp = 1:12
-        corSimilarity = corr(allBetasBigROI{endpointIndices(endpoint)}, allBetasBigROI{interp});
-        bar(interp, mean(mean(corSimilarity(corSimilarity ~= 1))),'FaceColor',colors{interp})
+if showDistancesSingleTrials
+    figure
+    for endpoint = 1:length(endpointIndices)
+        subplot(2,2,endpoint), hold on
+        for interp = 1:12
+            corSimilarity = corr(allBetasBigROI{endpointIndices(endpoint)}, allBetasBigROI{interp});
+            bar(interp, mean(mean(corSimilarity(corSimilarity ~= 1))),'FaceColor',colors{interp})
+        end
+        xlabel('Stimulus')
+        xticks(1:12)
+        xticklabels({'Grass','','','','','Leaves','Lemons','','','','','Bananas'})
+        ylabel('Correlation')
+        ylim([.3 .6])
+        title(sprintf('Correlation to %s', endpointNames{endpoint}))
     end
-    xlabel('Stimulus')
-    xticks(1:12)
-    xticklabels({'Grass','','','','','Leaves','Lemons','','','','','Bananas'})
-    ylabel('Correlation')
-    ylim([.3 .6])
-    title(sprintf('Correlation to %s', endpointNames{endpoint}))
 end
       
 %plot the correlations of THE AVERAGE OF THE 40 REPEATS with the average of the 40 repeats from the endpoint conditions
@@ -315,78 +313,105 @@ end
 for interp = 1:12
     allBetasBigROIAveraged{interp} = mean(allBetasBigROI{interp}, 2);
 end
-
-%do tsne the grass interpolations
-averagedInterps = cat(2, allBetasBigROIAveraged{[1:6]});
-[y, stress] = tsne(averagedInterps');
-%plot
-figure, subplot(1,2,1)
-plot(y(1:6,1),y(1:6,2),'g')
-
-xlabel('Dimension 1'), ylabel('dimension 2'), title('Grass -> leaves')
-
-averagedInterps = cat(2, allBetasBigROIAveraged{[7:12]});
-[y, stress] = tsne(averagedInterps');
-%plot
-subplot(1,2,2)
-plot(y(1:6,1),y(1:6,2),'Color', [0.9290 0.6940 0.1250])
-
-xlabel('Dimension 1'), ylabel('dimension 2'), title('Lemons -> Bananas')
-
+showAvgMDS=1
+if showAvgMDS
+    %do tsne the grass interpolations
+    averagedInterps = cat(2, allBetasBigROIAveraged{[1:6]});
+    [y, stress] = tsne(averagedInterps');
+    %plot
+    figure, subplot(1,2,1)
+    plot(y(1:6,1),y(1:6,2),'g')
+    
+    xlabel('Dimension 1'), ylabel('dimension 2'), title('Grass -> leaves')
+    
+    averagedInterps = cat(2, allBetasBigROIAveraged{[7:12]});
+    [y, stress] = tsne(averagedInterps');
+    %plot
+    subplot(1,2,2)
+    plot(y(1:6,1),y(1:6,2),'Color', [0.9290 0.6940 0.1250])
+    
+    xlabel('Dimension 1'), ylabel('dimension 2'), title('Lemons -> Bananas')
+end
 
 
 %% do maximum likelihood distance scaling on the averaged representation
 interpSets = {[1:6], [7:12]};
+bootstrap = 1;
+figure
 
+disp('Doing mlds - takes a minute or so.')
 %iterate through different interps
-for set = 1:length(interpSets)
+for repititions = 1:25
 
-    %simulate n draws of 4 images
-    numSamples = 10000;
-    averagedInterps = cat(2, allBetasBigROIAveraged{interpSets{set}});
-    corMatrix = corr(averagedInterps);
-    ims = randi(6,4,numSamples);
-
-    %calculate which pair has a higher correlation
-    responses = [];
-    for trial = 1:numSamples
-        responses(trial) = abs(corMatrix(ims(1,trial)) - corMatrix(ims(2,trial))) > abs(corMatrix(ims(3,trial)) - corMatrix(ims(4,trial)));
+    %average a different set of trials if bootstrapping
+    if bootstrap
+        for interp = 1:12
+            allBetasBigROIAveragedMlds{interp} = mean(allBetasBigROI{interp}(:,randi(40,1,40)), 2);
+        end
+        %if not bootstrapping, use the average of all presentations
+    else
+        allBetasBigROIAveragedMlds = allBetasBigROIAveraged;
     end
-    
-    % set up initial params
-    psi = [1:6];
-    sigma = 1;
-    initialParams = [psi, sigma];
-    
-    %options
-    options = optimset('fminsearch');
-    options.MaxFunEvals = 10000;  
-    options.MinFunEvals = 10000;  
-    options.MaxIter = 5000;
-    
-    %search for params
-    optimalParams = fminsearch(@(params) computeLoss(params, ims, responses), initialParams, options);
-    psi = optimalParams(1:6);
-    psi = (psi-min(psi));
-    psi = psi/max(psi);
-    
-    %plot
-    figure,scatter(1:6,psi, 'filled', 'MarkerFaceColor', colors{max(interpSets{set})}), hold on
-    gaussFit = fitCumulativeGaussian(1:6, psi);
-    PSE = gaussFit.mean;
-    plot(gaussFit.fitX,gaussFit.fitY,'color',colors{max(interpSets{set})})
-    scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
-    plot([1 6], [1 6],'k','lineStyle','--')
 
-    %limits and label
-    ylim([-0.05, 1.05]);
-    xlabel('Synthesized interpolation value')
-    ylabel('Neural interpolation value')
-    if set == 1; title('Grass to leaves mlds'); elseif set == 2, title('Lemons to bananas mlds'), end
+    %do the mlds
+    for set = 1:length(interpSets)
+    
+        %simulate n draws of 4 images
+        numSamples = 10000;
+        averagedInterps = cat(2, allBetasBigROIAveragedMlds{interpSets{set}});
+        corMatrix = corr(averagedInterps);
+        ims = randi(6,4,numSamples);
+    
+        %calculate which pair has a higher correlation
+        responses = [];
+        for trial = 1:numSamples
+            responses(trial) = corMatrix(ims(1,trial), ims(2,trial)) < corMatrix(ims(3,trial), ims(4,trial));
+        end
 
+        % set up initial params
+        psi = [0.5 0.5 0.5 0.5];
+        sigma = 1;
+        initialParams = [psi, sigma];
+        
+        %options
+        options = optimset('fminsearch');
+        options.MaxFunEvals = 10000;  
+        options.MinFunEvals = 0;  
+        options.MaxIter = 5000;
+        %options.TolFun = .0001;
+        
+        %search for params
+        optimalParams = fminsearch(@(params) computeLoss(params, ims, responses), initialParams, options);
+        psi = [0 optimalParams(1:4) 1];
+        psi = (psi-min(psi));
+        psi = psi/max(psi);
+        
+        %plot
+        subplot(1,2,set), hold on
+        scatter(1:6,psi, 'filled', 'MarkerFaceColor', colors{max(interpSets{set})})
+        gaussFit = fitCumulativeGaussian(1:6, psi);
+        PSE = gaussFit.mean;
+        plot(gaussFit.fitX,gaussFit.fitY,'color',colors{max(interpSets{set})})
+        scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
+        plot([1 6], [0 1],'k','lineStyle','--')
+    
+        %limits and label
+        ylim([-0.05, 1.05]);
+        xlabel('Synthesized interpolation value')
+        ylabel('Neural interpolation value')
+        if set == 1; title('Grass to leaves mlds'); elseif set == 2, title('Lemons to bananas mlds'), end
+    
+    end
 end
 
 %%
+
+
+keyboard
+
+
+
+
 
 
 
@@ -406,16 +431,14 @@ end
 %%%%%%%%%%%%%%%%%%%
 function totalProb = computeLoss(params, ims, responses)
     % set interp values as psi and get differences between top and bottom pair
-    psi = params(1:6);
-    sigma = params(7);
+    psi = [0 params(1:4) 1];
+    sigma = params(5);
     for interpVal = 1:6
         ims(ims == (interpVal)) = psi(interpVal);
     end
     diffs = abs(ims(1,:)-ims(2,:)) - abs(ims(3,:)-ims(4,:));
-    keyboard
     % count up probability
     totalProb = 0;
-    
     for responseNum = 1:length(diffs)
         if responses(responseNum) == 1
             probResponse = -log(normcdf(diffs(responseNum),0,sigma));
@@ -425,42 +448,10 @@ function totalProb = computeLoss(params, ims, responses)
             totalProb = totalProb + probResponse;
         end
     end
-
+    %disp(totalProb)
 
 
 %%
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
