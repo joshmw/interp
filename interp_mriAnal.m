@@ -17,6 +17,7 @@ function interp_mriAnal(varargin)
 %    showAvgMDS/showDistancesSingleTrial: flags to show analyses I don't think are relevant
 %    mldsReps: number of mlds bootstraps. if set above 1, when averaging each condition, will average a random subset of trials instead of all
 %    plotBig: plots things in their own graphs rather than as subplots
+%    doROImlds: flag for if you want to do mlds in each ROI. takes a while to do this, so set to 0 to save time
 %    numBetasEachScan: Used for zscoring. Should be the number of betas you get from each scan from glmSingle (e.g. 12 conds x 4 repeats = 48)
 %    numScansInGLM: Used for zscoring. Needed to zscore over individual scans.
 %    numStimRepeats: Number of repeats of each stimulus (how many times shown in scanner)
@@ -26,7 +27,7 @@ function interp_mriAnal(varargin)
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliability_cutoff=.65', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=1', 'numBoots=100', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0',...
+getArgs(varargin, {'reliability_cutoff=.6', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=1', 'numBoots=100', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
     'numBetasEachScan=48', 'numScansInGLM=10', 'numStimRepeats=40','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
@@ -448,9 +449,10 @@ for repititions = 1:mldsReps
     end
 end
 
-keyboard
 
 %% do maximum likelihood distance scaling on the averaged representation across different ROIs
+if doROImlds
+
 figure, sub = 1; numSubs = sum(numUsableVoxelsByROI > 0); allSubs = 1:length(numUsableVoxelsByROI);
 
 disp('Doing mlds on the individual ROIs - takes a bit.')
@@ -527,11 +529,77 @@ for roi = [1 3 5 7]%allSubs(numUsableVoxelsByROI>2)
     end
     sub = sub+1;
 end
+end
+         
 
+
+%% classification - train an SVM on the endpoints and see how it predicts the interpolations
+figure
+
+for set = 1:length(interpSets)
+    %define endpoints
+    end1 = min(cell2mat(interpSets(set))); end2 = max(cell2mat(interpSets(set)));
+    %get data for SVM
+    data = [allBetasBigROI{end1}'; allBetasBigROI{end2}'];
+    labels = [repmat(0,1,numStimRepeats) repmat(1,1,numStimRepeats)];
+    %fit it
+    svm = fitcsvm(data,labels);
     
+    %plot the results of different interpolation classifications
+    subplot(1,2,set), hold on
+    numEndpoint2 = [];
+    for interp = cell2mat(interpSets(set));
+        numEndpoint2 = [numEndpoint2 mean(svm.predict(allBetasBigROI{interp}'))];
+    end
+    scatter(cell2mat(interpSets(1)),numEndpoint2,'filled','markerFaceColor',colors{max(interpSets{set})});
+    %equality line
+    plot([1 6], [0 1],'k','lineStyle','--')
+    gaussFit = fitCumulativeGaussian(1:6, numEndpoint2);
+    plot(gaussFit.fitX,gaussFit.fitY,'color',colors{max(interpSets{set})})
+    scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
+    xlabel('Interpolation value')
+    ylabel('Percent classified as endpoint 2')
+    if set == 1; title('Grass to leaves'); elseif set == 2, title('Lemons to bananas'), end
+end
+
+
+
+%% classification - individual ROIs
+figure, sub = 1; numSubs = sum(numUsableVoxelsByROI > 0); allSubs = 1:length(numUsableVoxelsByROI);
+
+for roi = allSubs(numUsableVoxelsByROI>2)%[1 3 5 7];
+    for set = 1:length(interpSets)
+        %define endpoints
+        end1 = min(cell2mat(interpSets(set))); end2 = max(cell2mat(interpSets(set)));
+        %get data for SVM
+        data = [allBetasCombinedFiltered{roi}{end1}'; allBetasCombinedFiltered{roi}{end2}'];
+        labels = [repmat(0,1,numStimRepeats) repmat(1,1,numStimRepeats)];
+        %fit it
+        svm = fitcsvm(data,labels);
+        
+        %plot the results of different interpolation classifications
+        numEndpoint2 = [];
+        for interp = cell2mat(interpSets(set));
+            numEndpoint2 = [numEndpoint2 mean(svm.predict(allBetasCombinedFiltered{roi}{interp}'))];
+        end
+        %plot
+        subplot(2,numSubs,(set-1)*length(allSubs(numUsableVoxelsByROI>2))+sub), hold on
+        scatter(cell2mat(interpSets(1)),numEndpoint2,'filled','markerFaceColor',colors{max(interpSets{set})});
+        %equality line
+        plot([1 6], [0 1],'k','lineStyle','--')
+        gaussFit = fitCumulativeGaussian(1:6, numEndpoint2);
+        plot(gaussFit.fitX,gaussFit.fitY,'color',colors{max(interpSets{set})})
+        scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
+        xlabel('Interpolation value')
+        ylabel('Percent classified as endpoint 2')
+        if set == 1; title(roiNames{roi},'Grass to leaves'); elseif set == 2, title(roiNames{roi},'Lemons to bananas'), end
+    end
+    sub = sub+1;
+end
+
+
+%%
 keyboard
-
-
 
 
 
