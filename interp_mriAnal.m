@@ -27,7 +27,7 @@ function interp_mriAnal(varargin)
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliability_cutoff=.6', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=1', 'numBoots=100', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
+getArgs(varargin, {'reliability_cutoff=.6', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
     'numBetasEachScan=48', 'numScansInGLM=10', 'numStimRepeats=40','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
@@ -65,18 +65,6 @@ for roi = 1:length(roiNames)
 end
 
 
-%% if you want to truncate the data (fewer repeats), do so here by setting truncateTrials <1
-%note that we calculated reliability before truncating. Might want to switch.
-numStimRepeats = numStimRepeats * truncateTrials;
-numScansInGLM = numScansInGLM * truncateTrials;
-for taskNum = 1:2,
-    task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,1:(numBetasEachScan*numScansInGLM));
-    task{taskNum}.trial_conditions = task{taskNum}.trial_conditions(1:(numBetasEachScan*numScansInGLM));
-    %you can make it backwards if you uncomment these. the proportion included will flip (.7 truncate -> include last .3 of data). DO NOT UNCOMMENT if not truncating.
-    %task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,((numBetasEachScan*numScansInGLM)+1):end);
-    %task{taskNum}.trial_conditions = task{taskNum}.trial_conditions((numBetasEachScan*numScansInGLM+1):end);
-end
-
 
 %% calculate the reliability of individual voxels (consistancy of beta values across presentations)
 for taskNum = 1:2;
@@ -106,6 +94,21 @@ for taskNum = 1:2;
     
     task{taskNum}.reliability = mean(reliability,2);
 end
+
+
+%% if you want to truncate the data (fewer repeats), do so here by setting truncateTrials <1
+%note that we calculated reliability before truncating. Might want to switch.
+numStimRepeats = numStimRepeats * truncateTrials;
+numScansInGLM = numScansInGLM * truncateTrials;
+for taskNum = 1:2,
+    task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,1:(numBetasEachScan*numScansInGLM));
+    task{taskNum}.trial_conditions = task{taskNum}.trial_conditions(1:(numBetasEachScan*numScansInGLM));
+    %you can make it backwards if you uncomment these. the proportion included will flip (.7 truncate -> include last .3 of data). DO NOT UNCOMMENT if not truncating.
+    %task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,((numBetasEachScan*numScansInGLM)+1):end);
+    %task{taskNum}.trial_conditions = task{taskNum}.trial_conditions((numBetasEachScan*numScansInGLM+1):end);
+end
+
+
 
 %% Average together the same stimulus presentations, partition by ROI and get rid of voxels under reliability cutoff
 %average together trials that were of the same stim type
@@ -259,6 +262,8 @@ for sub = 1:2:length(roiNames);
 
 end
 
+
+
 %% plot embeddings of individual trials in combined ROIS
 
 %pick the ROIs you want to concatenate together
@@ -377,6 +382,7 @@ if showAvgMDS
 end
 
 
+
 %% do maximum likelihood distance scaling on the averaged representation with voxels from all ROIs
 interpSets = {[1:6], [7:12]};
 figure
@@ -403,7 +409,6 @@ for repititions = 1:mldsReps
         averagedInterps = cat(2, allBetasBigROIAveragedMlds{interpSets{set}});
         corMatrix = corr(averagedInterps);
         ims = randi(6,4,numSamples);
-    
         %calculate which pair has a higher correlation
         responses = [];
         for trial = 1:numSamples
@@ -448,16 +453,18 @@ for repititions = 1:mldsReps
     
     end
 end
+sgtitle(sprintf('MLDS, all %i voxels in all ROIs', sum(numUsableVoxelsByROI)))
 
 
-%% do maximum likelihood distance scaling on the averaged representation across different ROIs
+
+%% do mlds on the averaged representation across different ROIs
 if doROImlds
 
 figure, sub = 1; numSubs = sum(numUsableVoxelsByROI > 0); allSubs = 1:length(numUsableVoxelsByROI);
 
 disp('Doing mlds on the individual ROIs - takes a bit.')
 %iterate through different ROIs
-for roi = [1 3 5 7]%allSubs(numUsableVoxelsByROI>2)
+for roi = allSubs(numUsableVoxelsByROI>5);
 
     %iterate through different interps
     for repititions = 1:mldsReps
@@ -523,14 +530,15 @@ for roi = [1 3 5 7]%allSubs(numUsableVoxelsByROI>2)
             ylim([-0.05, 1.05]); xlim([1 6])
             %xlabel('Synthesized interpolation value')
             %ylabel('Neural interpolation value')
-            if set == 1; title(roiNames{roi},'Grass to leaves'); elseif set == 2, title(roiNames{roi},'Lemons to bananas'), end
+            title(roiNames{roi},sprintf('%i voxels',numUsableVoxelsByROI(roi)))
         
         end
     end
     sub = sub+1;
 end
+sgtitle('MLDS, individual ROIs')
 end
-         
+
 
 
 %% classification - train an SVM on the endpoints and see how it predicts the interpolations
@@ -554,14 +562,14 @@ for set = 1:length(interpSets)
     scatter(cell2mat(interpSets(1)),numEndpoint2,'filled','markerFaceColor',colors{max(interpSets{set})});
     %equality line
     plot([1 6], [0 1],'k','lineStyle','--')
-    gaussFit = fitCumulativeGaussian(1:6, numEndpoint2);
+    gaussFit = fitCumulativeGaussian(1:6,        numEndpoint2);
     plot(gaussFit.fitX,gaussFit.fitY,'color',colors{max(interpSets{set})})
     scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
     xlabel('Interpolation value')
     ylabel('Percent classified as endpoint 2')
     if set == 1; title('Grass to leaves'); elseif set == 2, title('Lemons to bananas'), end
 end
-
+sgtitle(sprintf('Classification using all %i voxels', sum(numUsableVoxelsByROI)))
 
 
 %% classification - individual ROIs
@@ -585,30 +593,31 @@ for roi = allSubs(numUsableVoxelsByROI>2)%[1 3 5 7];
         %plot
         subplot(2,numSubs,(set-1)*length(allSubs(numUsableVoxelsByROI>2))+sub), hold on
         scatter(cell2mat(interpSets(1)),numEndpoint2,'filled','markerFaceColor',colors{max(interpSets{set})});
-        %equality line
+        %equality line and PSE
         plot([1 6], [0 1],'k','lineStyle','--')
         gaussFit = fitCumulativeGaussian(1:6, numEndpoint2);
-        plot(gaussFit.fitX,gaussFit.fitY,'color',colors{max(interpSets{set})})
+        plot(gaussFit.fitX,gaussFit.fitY,'color',colors{max(interpSets{set})});
         scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
+        %label
         xlabel('Interpolation value')
         ylabel('Percent classified as endpoint 2')
-        if set == 1; title(roiNames{roi},'Grass to leaves'); elseif set == 2, title(roiNames{roi},'Lemons to bananas'), end
+        title(roiNames{roi},sprintf('%i voxels',numUsableVoxelsByROI(roi)))
+        xlim([1 6])
     end
     sub = sub+1;
 end
-
+sgtitle('Classification in individual ROIs')
 
 %%
+
 keyboard
 
 
 
 
-
-
-
-
-
+%%%%%%%%%%%%%%%%%%%
+%% END OF SCRIPT %%
+%%%%%%%%%%%%%%%%%%%
 
 
 
@@ -649,7 +658,7 @@ function totalProb = computeLoss(params, ims, responses)
 
 
 
-% 
+%
 % %%compute the gsn noise ceiling and compare to Kendrick's GSN
 % 
 % %%
@@ -675,7 +684,76 @@ function totalProb = computeLoss(params, ims, responses)
 
 
 
+% this doesn't work. well, it does for grass/leaves, but it's awful for lemons/bananas. single representations aren't good enough I guess. maybe
+% should try with different voxel cutoffs but for now it's shit
 
+% %% do mlds on UNAVERAGED representations
+% interpSets = {[1:6], [7:12]};
+% figure
+% 
+% disp('Doing mlds - takes a minute or so.')
+% %iterate through different interps
+% for repititions = 1:mldsReps
+% 
+%     %get single trial correlations
+%     for set = 1:length(interpSets)      
+%         corMatrix = [];
+%         for interp = interpSets{set}
+%             for interp2 = interpSets{set}
+%                 allCors = corr(allBetasBigROI{interp}, allBetasBigROI{interp2});
+%                 corMatrix(interp,interp2,:) = allCors(tril(allCors,-1) ~= 0);
+%             end
+%         end
+%         %simulate n draws of 4 images
+%         numSamples = 50000;
+%         ims = randi(6,4,numSamples);
+%         %calculate which pair has a higher correlation
+%         responses = [];
+%         for trial = 1:numSamples
+%             responses(trial) = corMatrix(ims(1,trial), ims(2,trial), randi(size(corMatrix,3))) < corMatrix(ims(3,trial), ims(4,trial), randi(size(corMatrix,3)));
+%             j = ims(1,trial); k = ims(2,trial); l = ims(3,trial); m = ims(4,trial);
+%             if j == k | l == m | isequal(sort([j k]), sort([l m]));
+%                 responses(trial) = 2;
+%             end
+%         end
+% 
+%         % set up initial params
+%         psi = [0.5 0.5 0.5 0.5];
+%         sigma = .3;
+%         initialParams = [psi, sigma];
+%         
+%         %options
+%         options = optimset('fminsearch'); options.MaxFunEvals = 10000; options.MinFunEvals = 0; options.MaxIter = 5000;
+%         %options.TolFun = .0001;
+%         
+%         %search for params
+%         optimalParams = fminsearch(@(params) computeLoss(params, ims, responses), initialParams, options);
+%         psi = [0 optimalParams(1:4) 1];
+%         psi = (psi-min(psi));
+%         psi = psi/max(psi);
+%         
+%         %plot
+%         subplot(1,2,set), hold on
+%         scatter(1:6,psi, 'filled', 'MarkerFaceColor', colors{max(interpSets{set})})
+%         gaussFit = fitCumulativeGaussian(1:6, psi);
+%         PSE = gaussFit.mean;
+%         PSEs{set}(repititions) = PSE;
+%         plot(gaussFit.fitX,gaussFit.fitY,'color',colors{max(interpSets{set})})
+%         scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
+%         plot([1 6], [0 1],'k','lineStyle','--')
+%     
+%         %limits and label
+%         ylim([-0.05, 1.05]);
+%         xlim([1 6]);
+%         xlabel('Synthesized interpolation value')
+%         ylabel('Neural interpolation value')
+%         if set == 1; title('Grass to leaves mlds'); elseif set == 2, title('Lemons to bananas mlds'), end
+%     
+%     end
+% end
+% sgtitle(sprintf('MLDS, all %i voxels in all ROIs', sum(numUsableVoxelsByROI)))
+% 
+% 
 
 
 
