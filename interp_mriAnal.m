@@ -21,25 +21,31 @@ function interp_mriAnal(varargin)
 %    numBetasEachScan: Used for zscoring. Should be the number of betas you get from each scan from glmSingle (e.g. 12 conds x 4 repeats = 48)
 %    numScansInGLM: Used for zscoring. Needed to zscore over individual scans.
 %    numStimRepeats: Number of repeats of each stimulus (how many times shown in scanner)
-%    truncateTrials: If you want to useless data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data.
+%    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data.
 
 
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliability_cutoff=.6', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
-    'numBetasEachScan=48', 'numScansInGLM=10', 'numStimRepeats=40','truncateTrials=(10/10)'});
+getArgs(varargin, {'reliability_cutoff=.4', 'r2cutoff=0', 'stdCutoff=10', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
+    'numBetasEachScan=48', 'numScansInGLM=20', 'numStimRepeats=40','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE roi's shold be responsive
 %load the data
-cd('~/data/NEPR207/s625/s62520240429/')
-task{1} = load('s0625Task1ManyROIs.mat');
-task{2} = load('s0625Task2ManyROIs.mat');
+
+%cd('~/data/NEPR207/s625/')
+%task{1} = load('s0625Task1ManyROIs.mat');
+%task{2} = load('s0625Task2ManyROIs.mat');
+
+cd('~/data/interp/s0626/')
+task{1} = load('s0626Task2.mat');
+task{2} = load('s0626Task1.mat');
 
 %fix the stim names thing - remove the duplicate of the blanks
 for taskNum = 1:2,
     if length(task{taskNum}.stimNames) == 14; task{taskNum}.stimNames(8) = [];task{taskNum}.stimNames(1) = []; end
+    if length(task{taskNum}.stimNames) == 28; task{taskNum}.stimNames(8) = [];task{taskNum}.stimNames(1) = [];task{taskNum}.stimNames(15) = [];task{taskNum}.stimNames(22) = [] ;end
 end
 
 %swap the roiNums for task 2 so that we can do both hemispheres together
@@ -66,6 +72,20 @@ end
 
 
 
+%% if you want to truncate the data (fewer repeats), do so here by setting truncateTrials <1
+%note that we calculated reliability before truncating. Might want to switch.
+numStimRepeats = numStimRepeats * truncateTrials;
+numScansInGLM = numScansInGLM * truncateTrials;
+for taskNum = 1:2,
+    task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,1:(numBetasEachScan*numScansInGLM));
+    task{taskNum}.trial_conditions = task{taskNum}.trial_conditions(1:(numBetasEachScan*numScansInGLM));
+    %you can make it backwards if you uncomment these. the proportion included will flip (.7 truncate -> include last .3 of data). DO NOT UNCOMMENT if not truncating.
+    %task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,((numBetasEachScan*numScansInGLM)+1):end);
+    %task{taskNum}.trial_conditions = task{taskNum}.trial_conditions((numBetasEachScan*numScansInGLM+1):end);
+end
+
+
+
 %% calculate the reliability of individual voxels (consistancy of beta values across presentations)
 for taskNum = 1:2;
     task{taskNum}.betas = squeeze(squeeze(task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd));
@@ -74,7 +94,7 @@ for taskNum = 1:2;
         split1_amps = {};
         split2_amps = {};
         %
-        for cond = 1:12;%1:length(stimNames);
+        for cond = 1:length(task{taskNum}.stimNames);
             condition_amps{cond} = task{taskNum}.betas(:,task{taskNum}.trial_conditions==cond);
             nTrials = size(condition_amps{cond},2);
             
@@ -93,19 +113,6 @@ for taskNum = 1:2;
     end
     
     task{taskNum}.reliability = mean(reliability,2);
-end
-
-
-%% if you want to truncate the data (fewer repeats), do so here by setting truncateTrials <1
-%note that we calculated reliability before truncating. Might want to switch.
-numStimRepeats = numStimRepeats * truncateTrials;
-numScansInGLM = numScansInGLM * truncateTrials;
-for taskNum = 1:2,
-    task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,1:(numBetasEachScan*numScansInGLM));
-    task{taskNum}.trial_conditions = task{taskNum}.trial_conditions(1:(numBetasEachScan*numScansInGLM));
-    %you can make it backwards if you uncomment these. the proportion included will flip (.7 truncate -> include last .3 of data). DO NOT UNCOMMENT if not truncating.
-    %task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,((numBetasEachScan*numScansInGLM)+1):end);
-    %task{taskNum}.trial_conditions = task{taskNum}.trial_conditions((numBetasEachScan*numScansInGLM+1):end);
 end
 
 
@@ -202,7 +209,7 @@ title('Beta weights')
 %first, get all of the betas for individual stim types for rois
 for taskNum = 1:2
     for roi = 1:length(roiNames);
-        for condition = 1:12;
+        for condition = 1:length(task{1}.stimNames);
         %get betas for individual trials, filtering by reliability
             allBetas{taskNum}{roi}{condition} = task{taskNum}.betas((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliability_cutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),task{taskNum}.trial_conditions==condition);
         end
@@ -236,15 +243,18 @@ end
 
 %% plot embeddings of indidivual trials in individual ROIs
 figure
+if length(task{1}.stimNames) == 12; endpointNums = [1 6 7 12];
+elseif length(task{1}.stimNames) == 24; endpointNums = [1 6 7 12 13 18 19 24];end
+
 for sub = 1:2:length(roiNames);
     % get the individual trials and reduce dimensions
-    singleTrials = cat(2, allBetasCombinedFiltered{sub}{[1 6 7 12]});
+    singleTrials = cat(2, allBetasCombinedFiltered{sub}{endpointNums});
     if size(singleTrials,1) > 2
         %[y stress] = mdscale(pdist(singleTrials'),2);
         [y, stress] = tsne(singleTrials');
     
         % plot the individual trials in different colors
-        subplot(4,5,ceil(sub/2)), hold on
+        subplot(6,8,ceil(sub/2)), hold on
         scatter(y(1:numStimRepeats,1),y(1:numStimRepeats,2),'g','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
         scatter(y((numStimRepeats+1):(numStimRepeats*2),1),y((numStimRepeats+1):(numStimRepeats*2),2),'b','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
         scatter(y((numStimRepeats*2+1):(numStimRepeats*3),1),y((numStimRepeats*2+1):(numStimRepeats*3),2),'r','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
@@ -266,8 +276,8 @@ end
 
 %% plot embeddings of individual trials in combined ROIS
 
-%pick the ROIs you want to concatenate together
-roisToCombine = [1 3 5 7 9 15 23 27 29];
+%pick the ROIs you want to concatenate together - check they have >5 voxels and are odd (contra)
+roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > 5); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
 
 %combine into a big ROI
 for stim = 1:length(task{1}.stimNames);
@@ -277,7 +287,7 @@ for stim = 1:length(task{1}.stimNames);
     end
 end
 
-singleTrialsBigROI = cat(2, allBetasBigROI{[1 6 7 12]});
+singleTrialsBigROI = cat(2, allBetasBigROI{endpointNums});
 %[y stress] = mdscale(pdist(singleTrialsBigROI'),2);
 [y, stress] = tsne(singleTrialsBigROI');
 
@@ -296,27 +306,32 @@ er3 = error_ellipse(cov(y((numStimRepeats*2+1):(numStimRepeats*3),:)),[mean(y((n
 %bananas
 scatter(y((numStimRepeats*3+1):(numStimRepeats*4),1),y((numStimRepeats*3+1):(numStimRepeats*4),2),'m','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
 er4 = error_ellipse(cov(y((numStimRepeats*3+1):(numStimRepeats*4),:)),[mean(y((numStimRepeats*3+1):(numStimRepeats*4),1)) mean(y((numStimRepeats*3+1):(numStimRepeats*4),2)),conf]); er4.Color = 'm';
+%acorns
+scatter(y((numStimRepeats*4+1):(numStimRepeats*5),1),y((numStimRepeats*4+1):(numStimRepeats*5),2),'k','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
+er4 = error_ellipse(cov(y((numStimRepeats*4+1):(numStimRepeats*5),:)),[mean(y((numStimRepeats*4+1):(numStimRepeats*5),1)) mean(y((numStimRepeats*4+1):(numStimRepeats*5),2)),conf]); er4.Color = 'k';
+
 
 %label
 title('Combined Ventral ROI')
 xlabel('Dimension 1')
 ylabel('Dimension 2')
-legend('Grass','','Leaves','','Lemons','','Bananas','')
+legend('Grass','','Leaves','','Lemons','','Bananas','Acorns','Redwood','Petals','Buttercream')
 
 
 
 %% plot distances between conditions
 endpointIndices = [1 6 7 12];
-colors = {'g','g','g','g','g','g',[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250]};
-endpointNames = {'Grass', 'Leaves', 'Lemons', 'Bananas'};
+colors = {'g','g','g','g','g','g',[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],...
+    'm','m','m','m','m','m', [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840]};
+endpointNames = {'Grass', 'Leaves', 'Lemons', 'Bananas','Acorns','Redwood','Petals','Buttercream'};
 
 %plot the correlations OF ALL REPEATS with the other repeats from the endpoint conditions
 if showDistancesSingleTrials
     figure
-    for endpoint = 1:length(endpointIndices)
-        subplot(2,2,endpoint), hold on
-        for interp = 1:12
-            corSimilarity = corr(allBetasBigROI{endpointIndices(endpoint)}, allBetasBigROI{interp});
+    for endpoint = 1:length(endpointNums)
+        subplot(2,4,endpoint), hold on
+        for interp = 1:length(task{1}.stimNames)
+            corSimilarity = corr(allBetasBigROI{endpointNums(endpoint)}, allBetasBigROI{interp});
             bar(interp, mean(mean(corSimilarity(corSimilarity ~= 1))),'FaceColor',colors{interp})
         end
         xlabel('Stimulus')
@@ -330,16 +345,16 @@ end
       
 %plot the correlations of THE AVERAGE OF THE 40 REPEATS with the average of the 40 repeats from the endpoint conditions
 figure
-for endpoint = 1:length(endpointIndices)
-    subplot(2,2,endpoint), hold on
-    for interp = 1:12
+for endpoint = 1:length(endpointNums)
+    subplot(2,4,endpoint), hold on
+    for interp = 1:length(task{1}.stimNames)
         %plot the correlation between the averaged interp stim and the endpoint you are on
-        corSimilarity = corr(mean(allBetasBigROI{endpointIndices(endpoint)},2), mean(allBetasBigROI{interp},2));
+        corSimilarity = corr(mean(allBetasBigROI{endpointNums(endpoint)},2), mean(allBetasBigROI{interp},2));
         %bar(interp, mean(mean(corSimilarity)),colors(interp))
         %calculate bootstraps sampling different presentations for the mean
         corBoots = [];
         for boot = 1:numBoots
-            corBoots = [corBoots corr(mean(allBetasBigROI{endpointIndices(endpoint)}(:,randi(numStimRepeats,1,numStimRepeats)),2), mean(allBetasBigROI{interp}(:,randi(numStimRepeats,1,numStimRepeats)),2))];
+            corBoots = [corBoots corr(mean(allBetasBigROI{endpointNums(endpoint)}(:,randi(numStimRepeats,1,numStimRepeats)),2), mean(allBetasBigROI{interp}(:,randi(numStimRepeats,1,numStimRepeats)),2))];
         end
         errorbar(interp, mean(corBoots), mean(corBoots)-prctile(corBoots,5), prctile(corBoots,95)-mean(corBoots), 'k')
         scatter(interp, mean(corBoots), 'filled','markerFaceColor',colors{interp})
@@ -358,10 +373,10 @@ end
 
 %% Try doing to multi-dimensional scaling on the interpolations...
 %average the trials together
-for interp = 1:12
+for interp = 1:length(task{1}.stimNames)
     allBetasBigROIAveraged{interp} = mean(allBetasBigROI{interp}, 2);
 end
-showAvgMDS=1
+showAvgMDS=1;
 if showAvgMDS
     %do tsne the grass interpolations
     averagedInterps = cat(2, allBetasBigROIAveraged{[1:6]});
@@ -384,7 +399,7 @@ end
 
 
 %% do maximum likelihood distance scaling on the averaged representation with voxels from all ROIs
-interpSets = {[1:6], [7:12]};
+interpSets = {[1:6], [7:12], [13:18], [19:24]};
 figure
 
 disp('Doing mlds - takes a minute or so.')
@@ -393,7 +408,7 @@ for repititions = 1:mldsReps
 
     %average a different set of trials if bootstrapping
     if mldsReps > 1
-        for interp = 1:12
+        for interp = 1:length(task{1}.stimNames)
             allBetasBigROIAveragedMlds{interp} = mean(allBetasBigROI{interp}(:,randi(numStimRepeats,1,numStimRepeats)), 2);
         end
         %if not bootstrapping, use the average of all presentations
@@ -407,9 +422,11 @@ for repititions = 1:mldsReps
         %simulate n draws of 4 images
         numSamples = 10000;
         averagedInterps = cat(2, allBetasBigROIAveragedMlds{interpSets{set}});
-        corMatrix = corr(averagedInterps);
-        ims = randi(6,4,numSamples);
+        %can use either correlations or euclidean distance
+        %corMatrix = corr(averagedInterps);
+        corMatrix = squareform(pdist(averagedInterps','euclidean')); corMatrix(corMatrix>0) = -corMatrix(corMatrix>0);
         %calculate which pair has a higher correlation
+        ims = randi(6,4,numSamples);
         responses = [];
         for trial = 1:numSamples
             responses(trial) = corMatrix(ims(1,trial), ims(2,trial)) < corMatrix(ims(3,trial), ims(4,trial));
@@ -420,8 +437,9 @@ for repititions = 1:mldsReps
         end
 
         % set up initial params
-        psi = [0.5 0.5 0.5 0.5];
-        sigma = .3;
+        %psi = [0.5 0.5 0.5 0.5];
+        psi = [.2 .4 .6 .8];
+        sigma = .5;
         initialParams = [psi, sigma];
         
         %options
@@ -435,7 +453,7 @@ for repititions = 1:mldsReps
         psi = psi/max(psi);
         
         %plot
-        subplot(1,2,set), hold on
+        subplot(1,4,set), hold on
         scatter(1:6,psi, 'filled', 'MarkerFaceColor', colors{max(interpSets{set})})
         gaussFit = fitCumulativeGaussian(1:6, psi);
         PSE = gaussFit.mean;
@@ -449,8 +467,9 @@ for repititions = 1:mldsReps
         xlim([1 6]);
         xlabel('Synthesized interpolation value')
         ylabel('Neural interpolation value')
-        if set == 1; title('Grass to leaves mlds'); elseif set == 2, title('Lemons to bananas mlds'), end
+        if set == 1; title('Grass to leaves mlds'); elseif set == 2, title('Lemons to bananas mlds'); elseif set == 3, title('Petals to buttercream mlds'); elseif set == 4, title('Acorns to redwood mlds'),end
     
+        allPsi{set}{repititions} = psi;
     end
 end
 sgtitle(sprintf('MLDS, all %i voxels in all ROIs', sum(numUsableVoxelsByROI)))
@@ -502,7 +521,8 @@ for roi = allSubs(numUsableVoxelsByROI>5);
     
             % set up initial params
             psi = [0.5 0.5 0.5 0.5];
-            sigma = .3;
+            %psi = [.2 .4 .6 .8];
+            sigma = .5;
             initialParams = [psi, sigma];
             
             %options
@@ -554,7 +574,7 @@ for set = 1:length(interpSets)
     svm = fitcsvm(data,labels);
     
     %plot the results of different interpolation classifications
-    subplot(1,2,set), hold on
+    subplot(1,4,set), hold on
     numEndpoint2 = [];
     for interp = cell2mat(interpSets(set));
         numEndpoint2 = [numEndpoint2 mean(svm.predict(allBetasBigROI{interp}'))];
@@ -567,7 +587,7 @@ for set = 1:length(interpSets)
     scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
     xlabel('Interpolation value')
     ylabel('Percent classified as endpoint 2')
-    if set == 1; title('Grass to leaves'); elseif set == 2, title('Lemons to bananas'), end
+    if set == 1; title('Grass to leaves'); elseif set == 2, title('Lemons to bananas'); elseif set == 3, title('Petals to buttercream'); elseif set == 4, title('Acorns to redwood'),end
 end
 sgtitle(sprintf('Classification using all %i voxels', sum(numUsableVoxelsByROI)))
 
@@ -591,7 +611,7 @@ for roi = allSubs(numUsableVoxelsByROI>2)%[1 3 5 7];
             numEndpoint2 = [numEndpoint2 mean(svm.predict(allBetasCombinedFiltered{roi}{interp}'))];
         end
         %plot
-        subplot(2,numSubs,(set-1)*length(allSubs(numUsableVoxelsByROI>2))+sub), hold on
+        subplot(4,numSubs,(set-1)*length(allSubs(numUsableVoxelsByROI>2))+sub), hold on
         scatter(cell2mat(interpSets(1)),numEndpoint2,'filled','markerFaceColor',colors{max(interpSets{set})});
         %equality line and PSE
         plot([1 6], [0 1],'k','lineStyle','--')
@@ -658,10 +678,10 @@ function totalProb = computeLoss(params, ims, responses)
 
 
 
-%
-% %%compute the gsn noise ceiling and compare to Kendrick's GSN
-% 
-% %%
+
+%%compute the gsn noise ceiling and compare to Kendrick's GSN
+
+%%
 % for cond = 1:12
 %     gsnInTask1(:,cond,:) = task{1}.betas(:,task{1}.trial_conditions==cond);
 %     gsnInTask2(:,cond,:) = task{2}.betas(:,task{2}.trial_conditions==cond); 
