@@ -27,25 +27,25 @@ function interp_mriAnal(varargin)
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliability_cutoff=.4', 'r2cutoff=0', 'stdCutoff=10', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
-    'numBetasEachScan=48', 'numScansInGLM=20', 'numStimRepeats=40','truncateTrials=(10/10)'});
+getArgs(varargin, {'reliability_cutoff=.5', 'r2cutoff=0', 'stdCutoff=10', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
+    'numBetasEachScan=48', 'numScansInGLM=10', 'numStimRepeats=40','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE roi's shold be responsive
 %load the data
 
-%cd('~/data/NEPR207/s625/')
-%task{1} = load('s0625Task1ManyROIs.mat');
-%task{2} = load('s0625Task2ManyROIs.mat');
+cd('~/data/NEPR207/s625/')
+task{1} = load('s0625Task1ManyROIs.mat');
+task{2} = load('s0625Task2ManyROIs.mat');
 
-cd('~/data/interp/s0626/')
-task{1} = load('s0626Task2.mat');
-task{2} = load('s0626Task1.mat');
+%cd('~/data/interp/s0626/')
+%task{1} = load('s0626Task2.mat');
+%task{2} = load('s0626Task1.mat');
 
 %fix the stim names thing - remove the duplicate of the blanks
 for taskNum = 1:2,
     if length(task{taskNum}.stimNames) == 14; task{taskNum}.stimNames(8) = [];task{taskNum}.stimNames(1) = []; end
-    if length(task{taskNum}.stimNames) == 28; task{taskNum}.stimNames(8) = [];task{taskNum}.stimNames(1) = [];task{taskNum}.stimNames(15) = [];task{taskNum}.stimNames(22) = [] ;end
+    if length(task{taskNum}.stimNames) == 28; task{taskNum}.stimNames(22) = [];task{taskNum}.stimNames(15) = [];task{taskNum}.stimNames(8) = [];task{taskNum}.stimNames(1) = [] ;end
 end
 
 %swap the roiNums for task 2 so that we can do both hemispheres together
@@ -111,7 +111,7 @@ for taskNum = 1:2;
         reliability(:,boot) = diag(corr(s1a', s2a'));
     
     end
-    
+    task{taskNum}.allBootReliability = reliability;
     task{taskNum}.reliability = mean(reliability,2);
 end
 
@@ -277,7 +277,7 @@ end
 %% plot embeddings of individual trials in combined ROIS
 
 %pick the ROIs you want to concatenate together - check they have >5 voxels and are odd (contra)
-roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > 5); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
+roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > 1); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
 
 %combine into a big ROI
 for stim = 1:length(task{1}.stimNames);
@@ -307,8 +307,8 @@ er3 = error_ellipse(cov(y((numStimRepeats*2+1):(numStimRepeats*3),:)),[mean(y((n
 scatter(y((numStimRepeats*3+1):(numStimRepeats*4),1),y((numStimRepeats*3+1):(numStimRepeats*4),2),'m','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
 er4 = error_ellipse(cov(y((numStimRepeats*3+1):(numStimRepeats*4),:)),[mean(y((numStimRepeats*3+1):(numStimRepeats*4),1)) mean(y((numStimRepeats*3+1):(numStimRepeats*4),2)),conf]); er4.Color = 'm';
 %acorns
-scatter(y((numStimRepeats*4+1):(numStimRepeats*5),1),y((numStimRepeats*4+1):(numStimRepeats*5),2),'k','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
-er4 = error_ellipse(cov(y((numStimRepeats*4+1):(numStimRepeats*5),:)),[mean(y((numStimRepeats*4+1):(numStimRepeats*5),1)) mean(y((numStimRepeats*4+1):(numStimRepeats*5),2)),conf]); er4.Color = 'k';
+%scatter(y((numStimRepeats*4+1):(numStimRepeats*5),1),y((numStimRepeats*4+1):(numStimRepeats*5),2),'k','filled','MarkerEdgeColor','w','MarkerFaceAlpha',.5)
+%er4 = error_ellipse(cov(y((numStimRepeats*4+1):(numStimRepeats*5),:)),[mean(y((numStimRepeats*4+1):(numStimRepeats*5),1)) mean(y((numStimRepeats*4+1):(numStimRepeats*5),2)),conf]); er4.Color = 'k';
 
 
 %label
@@ -423,8 +423,8 @@ for repititions = 1:mldsReps
         numSamples = 10000;
         averagedInterps = cat(2, allBetasBigROIAveragedMlds{interpSets{set}});
         %can use either correlations or euclidean distance
-        %corMatrix = corr(averagedInterps);
-        corMatrix = squareform(pdist(averagedInterps','euclidean')); corMatrix(corMatrix>0) = -corMatrix(corMatrix>0);
+        corMatrix = corr(averagedInterps);
+        %corMatrix = squareform(pdist(averagedInterps','euclidean')); corMatrix(corMatrix>0) = -corMatrix(corMatrix>0);
         %calculate which pair has a higher correlation
         ims = randi(6,4,numSamples);
         responses = [];
@@ -629,7 +629,6 @@ end
 sgtitle('Classification in individual ROIs')
 
 %%
-
 keyboard
 
 
