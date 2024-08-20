@@ -21,26 +21,26 @@ function interp_mriAnal(varargin)
 %    numBetasEachScan: Used for zscoring. Should be the number of betas you get from each scan from glmSingle (e.g. 12 conds x 4 repeats = 48)
 %    numScansInGLM: Used for zscoring. Needed to zscore over individual scans.
 %    numStimRepeats: Number of repeats of each stimulus (how many times shown in scanner)
-%    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data.
+%    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliability_cutoff=.5', 'r2cutoff=0', 'stdCutoff=10', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
-    'numBetasEachScan=48', 'numScansInGLM=10', 'numStimRepeats=40','truncateTrials=(10/10)'});
+getArgs(varargin, {'reliability_cutoff=.45', 'r2cutoff=0', 'stdCutoff=10', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
+    'numBetasEachScan=48', 'numScansInGLM=20', 'numStimRepeats=40','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE roi's shold be responsive
 %load the data
 
-cd('~/data/NEPR207/s625/')
-task{1} = load('s0625Task1ManyROIs.mat');
-task{2} = load('s0625Task2ManyROIs.mat');
+%cd('~/data/NEPR207/s625/')
+%task{1} = load('s0625Task1ManyROIs.mat');
+%task{2} = load('s0625Task2ManyROIs.mat');
 
-%cd('~/data/interp/s0626/')
-%task{1} = load('s0626Task2.mat');
-%task{2} = load('s0626Task1.mat');
+cd('~/data/interp/s0626/')
+task{1} = load('s0626Task2.mat');
+task{2} = load('s0626Task1.mat');
 
 %fix the stim names thing - remove the duplicate of the blanks
 for taskNum = 1:2,
@@ -277,7 +277,7 @@ end
 %% plot embeddings of individual trials in combined ROIS
 
 %pick the ROIs you want to concatenate together - check they have >5 voxels and are odd (contra)
-roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > 1); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
+roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > 5); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
 
 %combine into a big ROI
 for stim = 1:length(task{1}.stimNames);
@@ -479,7 +479,8 @@ sgtitle(sprintf('MLDS, all %i voxels in all ROIs', sum(numUsableVoxelsByROI)))
 %% do mlds on the averaged representation across different ROIs
 if doROImlds
 
-figure, sub = 1; numSubs = sum(numUsableVoxelsByROI > 0); allSubs = 1:length(numUsableVoxelsByROI);
+%%this is across individual ROIs.
+figure, sub = 1; numSubs = sum(numUsableVoxelsByROI > 5); allSubs = 1:length(numUsableVoxelsByROI);
 
 disp('Doing mlds on the individual ROIs - takes a bit.')
 %iterate through different ROIs
@@ -490,12 +491,12 @@ for roi = allSubs(numUsableVoxelsByROI>5);
     
         %average a different set of trials if bootstrapping
         if mldsReps > 1
-            for interp = 1:12
+            for interp = 1:length(task{1}.stimNames)
                 allBetasSingleROIAveragedMlds{interp} = mean(allBetasCombinedFiltered{roi}{interp}(:,randi(numStimRepeats,1,numStimRepeats)), 2);
             end
             %if not bootstrapping, use the average of all presentations
         else
-            for interp = 1:12
+            for interp = 1:length(task{1}.stimNames)
                 allBetasSingleROIAveragedMlds{interp} = mean(allBetasCombinedFiltered{roi}{interp}, 2);
             end
         end
@@ -537,7 +538,7 @@ for roi = allSubs(numUsableVoxelsByROI>5);
             
 
             %plot
-            subplot(2,numSubs,(set-1)*length(allSubs(numUsableVoxelsByROI>2))+sub), hold on
+            subplot(4,numSubs,(set-1)*length(roisToCombine)+sub), hold on
             scatter(1:6,psi, 'filled', 'MarkerFaceColor', colors{max(interpSets{set})})
             gaussFit = fitCumulativeGaussian(1:6, psi);
             PSE = gaussFit.mean;
@@ -557,7 +558,96 @@ for roi = allSubs(numUsableVoxelsByROI>5);
     sub = sub+1;
 end
 sgtitle('MLDS, individual ROIs')
+
+
+
+
+%%this is using all ROIs EXCEPT the one you are indexing.
+figure, sub = 1;
+
+%iterate through different ROIs
+for roi = allSubs(numUsableVoxelsByROI>5);
+
+    %iterate through different interps
+    for repititions = 1:mldsReps
+
+        %make leaveout
+        for stim = 1:length(task{1}.stimNames);
+            allBetasBigROILeaveout{stim} = [];
+            for roiLeave = roisToCombine(~(roisToCombine==roi)) %EXCEPT THE SINGLE ROI
+                allBetasBigROILeaveout{stim} = [allBetasBigROILeaveout{stim}; allBetasCombinedFiltered{roiLeave}{stim}];
+            end
+        end
+        
+        %get the leaveout average
+        for interp = 1:length(task{1}.stimNames)
+            allBetasBigROIAveragedLeaveout{interp} = mean(allBetasBigROILeaveout{interp}, 2);
+        end
+
+
+        %do the mlds
+        for set = 1:length(interpSets)
+        
+            %simulate n draws of 4 images
+            numSamples = 10000;
+            averagedInterps = cat(2, allBetasBigROILeaveout{interpSets{set}});
+            corMatrix = corr(averagedInterps);
+            ims = randi(6,4,numSamples);
+        
+            %calculate which pair has a higher correlation
+            responses = [];
+            for trial = 1:numSamples
+                responses(trial) = corMatrix(ims(1,trial), ims(2,trial)) < corMatrix(ims(3,trial), ims(4,trial));
+                j = ims(1,trial); k = ims(2,trial); l = ims(3,trial); m = ims(4,trial);
+                if j == k | l == m | isequal(sort([j k]), sort([l m]));
+                responses(trial) = 2;
+            end
+            end
+    
+            % set up initial params
+            psi = [0.5 0.5 0.5 0.5];
+            %psi = [.2 .4 .6 .8];
+            sigma = .5;
+            initialParams = [psi, sigma];
+            
+            %options
+            options = optimset('fminsearch'); options.MaxFunEvals = 10000; options.MinFunEvals = 0; options.MaxIter = 5000;
+            %options.TolFun = .0001;
+            
+            %search for params
+            optimalParams = fminsearch(@(params) computeLoss(params, ims, responses), initialParams, options);
+            psi = [0 optimalParams(1:4) 1];
+            psi = (psi-min(psi));
+            psi = psi/max(psi);
+            
+
+            %plot
+            subplot(4,numSubs,(set-1)*length(roisToCombine)+sub), hold on
+            scatter(1:6,psi, 'filled', 'MarkerFaceColor', colors{max(interpSets{set})})
+            gaussFit = fitCumulativeGaussian(1:6, psi);
+            PSE = gaussFit.mean;
+            PSEs{set}(repititions) = PSE;
+            plot(gaussFit.fitX,gaussFit.fitY,'color',colors{max(interpSets{set})})
+            scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
+            plot([1 6], [0 1],'k','lineStyle','--')
+        
+            %limits and label
+            ylim([-0.05, 1.05]); xlim([1 6])
+            %xlabel('Synthesized interpolation value')
+            %ylabel('Neural interpolation value')
+            title(roiNames{roi},sprintf('%i voxels',length(allBetasBigROILeaveout{1})))
+        
+        end
+    end
+    sub = sub+1
+
 end
+sgtitle('MLDS, LEAVING OUT individual ROIs')
+
+end
+
+
+
 
 
 
@@ -627,7 +717,6 @@ for roi = allSubs(numUsableVoxelsByROI>2)%[1 3 5 7];
     sub = sub+1;
 end
 sgtitle('Classification in individual ROIs')
-
 %%
 keyboard
 
