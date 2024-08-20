@@ -14,6 +14,7 @@ function interp_mriAnal(varargin)
 %    shuffleData: set to 1 to randomize condition labels in the very beginning (control measure)
 %    zscorebetas: set to 1 to zscore the betas in each run
 %    numBoots: number of bootstraps for split-half correlation analysis
+%    nVoxelsNeeded: Number of voxels an ROI needs to have to be included in the analysis (# voxels that meet reliability cutoff)
 %    showAvgMDS/showDistancesSingleTrial: flags to show analyses I don't think are relevant
 %    mldsReps: number of mlds bootstraps. if set above 1, when averaging each condition, will average a random subset of trials instead of all
 %    plotBig: plots things in their own graphs rather than as subplots
@@ -27,20 +28,20 @@ function interp_mriAnal(varargin)
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliability_cutoff=.45', 'r2cutoff=0', 'stdCutoff=10', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
-    'numBetasEachScan=48', 'numScansInGLM=20', 'numStimRepeats=40','truncateTrials=(10/10)'});
+getArgs(varargin, {'reliability_cutoff=.5', 'r2cutoff=0', 'stdCutoff=10', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=5' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
+    'numBetasEachScan=48', 'numScansInGLM=10', 'numStimRepeats=40','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE roi's shold be responsive
 %load the data
 
-%cd('~/data/NEPR207/s625/')
-%task{1} = load('s0625Task1ManyROIs.mat');
-%task{2} = load('s0625Task2ManyROIs.mat');
+cd('~/data/NEPR207/s625/')
+task{1} = load('s0625Task1ManyManyROIs.mat');
+task{2} = load('s0625Task2ManyManyROIs.mat');
 
-cd('~/data/interp/s0626/')
-task{1} = load('s0626Task2.mat');
-task{2} = load('s0626Task1.mat');
+%cd('~/data/interp/s0626/')
+%task{1} = load('s0626Task2.mat');
+%task{2} = load('s0626Task1.mat');
 
 %fix the stim names thing - remove the duplicate of the blanks
 for taskNum = 1:2,
@@ -277,7 +278,7 @@ end
 %% plot embeddings of individual trials in combined ROIS
 
 %pick the ROIs you want to concatenate together - check they have >5 voxels and are odd (contra)
-roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > 5); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
+roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > nVoxelsNeeded); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
 
 %combine into a big ROI
 for stim = 1:length(task{1}.stimNames);
@@ -399,7 +400,8 @@ end
 
 
 %% do maximum likelihood distance scaling on the averaged representation with voxels from all ROIs
-interpSets = {[1:6], [7:12], [13:18], [19:24]};
+interpSets = {[1:6], [7:12]};
+%interpSets = {[1:6], [7:12], [13:18], [19:24]};
 figure
 
 disp('Doing mlds - takes a minute or so.')
@@ -423,8 +425,8 @@ for repititions = 1:mldsReps
         numSamples = 10000;
         averagedInterps = cat(2, allBetasBigROIAveragedMlds{interpSets{set}});
         %can use either correlations or euclidean distance
-        corMatrix = corr(averagedInterps);
-        %corMatrix = squareform(pdist(averagedInterps','euclidean')); corMatrix(corMatrix>0) = -corMatrix(corMatrix>0);
+        corMatrix = corr(averagedInterps); %cosine di
+        %corMatrix = -pdist2(averagedInterps',averagedInterps'); %euclidean distance implementation
         %calculate which pair has a higher correlation
         ims = randi(6,4,numSamples);
         responses = [];
@@ -472,19 +474,18 @@ for repititions = 1:mldsReps
         allPsi{set}{repititions} = psi;
     end
 end
-sgtitle(sprintf('MLDS, all %i voxels in all ROIs', sum(numUsableVoxelsByROI)))
-
+sgtitle(sprintf('MLDS, all %i voxels in all ROIs', sum(numUsableVoxelsByROI(roisToCombine))))
 
 
 %% do mlds on the averaged representation across different ROIs
 if doROImlds
 
 %%this is across individual ROIs.
-figure, sub = 1; numSubs = sum(numUsableVoxelsByROI > 5); allSubs = 1:length(numUsableVoxelsByROI);
+figure, sub = 1; numSubs = length(roisToCombine); allSubs = 1:length(numUsableVoxelsByROI);
 
 disp('Doing mlds on the individual ROIs - takes a bit.')
 %iterate through different ROIs
-for roi = allSubs(numUsableVoxelsByROI>5);
+for roi = roisToCombine;
 
     %iterate through different interps
     for repititions = 1:mldsReps
@@ -566,7 +567,7 @@ sgtitle('MLDS, individual ROIs')
 figure, sub = 1;
 
 %iterate through different ROIs
-for roi = allSubs(numUsableVoxelsByROI>5);
+for roi = roisToCombine;
 
     %iterate through different interps
     for repititions = 1:mldsReps
@@ -639,7 +640,7 @@ for roi = allSubs(numUsableVoxelsByROI>5);
         
         end
     end
-    sub = sub+1
+    sub = sub+1;
 
 end
 sgtitle('MLDS, LEAVING OUT individual ROIs')
@@ -679,13 +680,13 @@ for set = 1:length(interpSets)
     ylabel('Percent classified as endpoint 2')
     if set == 1; title('Grass to leaves'); elseif set == 2, title('Lemons to bananas'); elseif set == 3, title('Petals to buttercream'); elseif set == 4, title('Acorns to redwood'),end
 end
-sgtitle(sprintf('Classification using all %i voxels', sum(numUsableVoxelsByROI)))
+sgtitle(sprintf('Classification using all %i voxels', sum(numUsableVoxelsByROI(roisToCombine))))
 
 
 %% classification - individual ROIs
-figure, sub = 1; numSubs = sum(numUsableVoxelsByROI > 0); allSubs = 1:length(numUsableVoxelsByROI);
+figure, sub = 1; numSubs = length(roisToCombine); allSubs = 1:length(numUsableVoxelsByROI);
 
-for roi = allSubs(numUsableVoxelsByROI>2)%[1 3 5 7];
+for roi = roisToCombine;
     for set = 1:length(interpSets)
         %define endpoints
         end1 = min(cell2mat(interpSets(set))); end2 = max(cell2mat(interpSets(set)));
@@ -701,7 +702,7 @@ for roi = allSubs(numUsableVoxelsByROI>2)%[1 3 5 7];
             numEndpoint2 = [numEndpoint2 mean(svm.predict(allBetasCombinedFiltered{roi}{interp}'))];
         end
         %plot
-        subplot(4,numSubs,(set-1)*length(allSubs(numUsableVoxelsByROI>2))+sub), hold on
+        subplot(4,numSubs,(set-1)*length(roisToCombine) + sub), hold on
         scatter(cell2mat(interpSets(1)),numEndpoint2,'filled','markerFaceColor',colors{max(interpSets{set})});
         %equality line and PSE
         plot([1 6], [0 1],'k','lineStyle','--')
@@ -762,6 +763,8 @@ function totalProb = computeLoss(params, ims, responses)
 
 
 %%
+
+
 
 
 
