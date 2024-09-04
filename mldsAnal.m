@@ -12,9 +12,10 @@ function mldsAnal(varargin)
 %set variables
 SIDnums = {'s600','s0601','s0602'}
 %SIDnums = {'s600'}
-showImagesOnGraphs = 0;
-bootstrap = 1;
-numBootstraps = 20;
+showImagesOnGraphs = 1; %display the actual images on the mlds curves
+bootstrap = 0; %binary: do you want to bootstrap?
+numBootstraps = 100; %if bootstrap=1, how many bootstraps you want to do
+plotSeperate = 0; %binary: switch subplots or not between subjects
 
 for SIDnum = 1:length(SIDnums)
     %get name of mat file and load it
@@ -22,8 +23,9 @@ for SIDnum = 1:length(SIDnums)
     load(filename);
 
     %change SUBnum for subplot reasons
-    SUBnum = 1 + 2*(SIDnum-1);
-    
+    if plotSeperate; SUBnum = 1 + 2*(SIDnum-1); else, SUBnum = 1; end
+    if plotSeperate == 0; numSubplots = 1; else numSubplots = length(SIDnums); end
+
     %get the names of the textures from the stim file
     task{1}.stimPath = 'Users/joshwilson/Desktop/interp/out/';
     texNames = [];
@@ -34,7 +36,11 @@ for SIDnum = 1:length(SIDnums)
     % iterate through the different texture names
     for texName = 1:length(texNames)
 
-        [psi, PSE] = calcPlotGraphs(texName, texNames, task, showImagesOnGraphs, SUBnum, SIDnums, 0, 1);
+        %calculate psi and PSE
+        [psi, PSE, mldsSigma, gaussSigma] = calcPlotGraphs(texName, texNames, task, showImagesOnGraphs, SUBnum, SIDnums, 0, 1, numSubplots);
+        
+        %put into a format that you can save out
+        data.psi{SIDnum}{texName} = psi; data.PSE{SIDnum}{texName} = PSE; data.mldsSigma{SIDnum}{texName} = mldsSigma; data.gaussSigma{SIDnum}{texName} = gaussSigma;
 
         %if you are bootstrapping confidence intervals on psi...
         if bootstrap
@@ -44,18 +50,18 @@ for SIDnum = 1:length(SIDnums)
 
             %iterate through bootstraps and save psi values
             for strap = 1:numBootstraps
-                [psiBootstraps(strap,:), PSEbootstraps(strap)] = calcPlotGraphs(texName, texNames, task, showImagesOnGraphs, SUBnum, SIDnums, 1, 0);
+                [psiBootstraps(strap,:), PSEbootstraps(strap)] = calcPlotGraphs(texName, texNames, task, showImagesOnGraphs, SUBnum, SIDnums, 1, 0, numSubplots);
             end
 
             %calc intervals and plot the bootstraps
             lowPercentilePsi = prctile(psiBootstraps(:,1:11),2.5);
             highPercentilePsi = prctile(psiBootstraps(:,1:11),97.5);
-            subplot(length(SIDnums),2,SUBnum)
+            subplot(numSubplots,2,SUBnum)
             errorbar(0:.1:1,psi,psi-lowPercentilePsi,highPercentilePsi-psi)
 
             lowPercetilePSE = prctile(PSEbootstraps,2.5);
             highPercetilePSE = prctile(PSEbootstraps,97.5);
-            subplot(length(SIDnums),2,SUBnum+1);
+            subplot(numSubplots,2,SUBnum+1);
             errorbar(PSE, .5, PSE - lowPercetilePSE, highPercetilePSE - PSE, 'horizontal');
 
         %end bootstrapping
@@ -65,6 +71,12 @@ for SIDnum = 1:length(SIDnums)
 %end subject loop
 end
 
+%save out a data file
+data.texNames = texNames;
+data.SIDnums = SIDnums;
+data.guide = 'Data are organized by {subject}{interp family}. Subject IDs and interp names are stored as SIDnums and texNames.'
+
+keyboard
 %end function
 end
 
@@ -74,7 +86,7 @@ end
 %%%%%%%%%%%%%
 %% calcPlotGraphs %%
 %%%%%%%%%%%%%%
-function [psi, PSE] = calcPlotGraphs(texName, texNames, task, showImagesOnGraphs, SUBnum, SIDnums, bootstrap, plotFunctions)
+function [psi, PSE, mldsSigma, gaussSigma] = calcPlotGraphs(texName, texNames, task, showImagesOnGraphs, SUBnum, SIDnums, bootstrap, plotFunctions, numSubplots)
 
 % get all the interp values
 allInterps = zeros(4,length(task{1}.i(task{1}.texGroup==texNames(texName))));
@@ -111,14 +123,16 @@ optimalParams = fminsearch(@(params) computeLoss(params, allInterps, responses, 
 psi = optimalParams(1:11);
 psi = (psi-min(psi));
 psi = psi/max(psi);
+mldsSigma = optimalParams(12);
 
 %fit a cumulative gaussian to it
 gaussFit = fitCumulativeGaussian([0:.1:1], psi);
 PSE = gaussFit.mean;
+gaussSigma = gaussFit.std;
 
 if plotFunctions
     %plot data
-    figure(texName), subplot(length(SIDnums),2,SUBnum), hold on
+    figure(texName), subplot(numSubplots,2,SUBnum), hold on
     plot((0:.1:1), psi,'k')
     xlabel('Interp value')
     ylabel('Perceptual distance')
@@ -147,7 +161,7 @@ if plotFunctions
     %plot([0 1], [0 1],'r','lineStyle','--')
     
     %fit a cumulative gaussian and plot on a new subplot
-    subplot(length(SIDnums),2,SUBnum+1), hold on
+    subplot(numSubplots,2,SUBnum+1), hold on
     plot([0 1], [0 1],'r','lineStyle','--')
     plot(gaussFit.fitX,gaussFit.fitY,'b')
     scatter(gaussFit.mean,.5,'k','filled')  
