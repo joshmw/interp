@@ -28,20 +28,25 @@ function interp_mriAnal(varargin)
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliability_cutoff=.5', 'r2cutoff=0', 'stdCutoff=10', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=5' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
-    'numBetasEachScan=48', 'numScansInGLM=10', 'numStimRepeats=40','truncateTrials=(10/10)'});
+getArgs(varargin, {'reliability_cutoff=.5', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=4' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
+    'numBetasEachScan=48', 'numScansInGLM=20', 'numStimRepeats=40','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE roi's shold be responsive
 %load the data
 
-cd('~/data/NEPR207/s625/')
-task{1} = load('s0625Task1ManyManyROIs.mat');
-task{2} = load('s0625Task2ManyManyROIs.mat');
+%cd('~/data/interp/s0625/')
+%task{1} = load('s0625Task1ManyManyROIs.mat');
+%task{2} = load('s0625Task2ManyManyROIs.mat');
 
 %cd('~/data/interp/s0626/')
 %task{1} = load('s0626Task2.mat');
 %task{2} = load('s0626Task1.mat');
+
+cd('~/data/interp/s0627/')
+task{1} = load('s0627Task2.mat');
+task{2} = load('s0627Task1.mat');
+
 
 %fix the stim names thing - remove the duplicate of the blanks
 for taskNum = 1:2,
@@ -316,7 +321,7 @@ er4 = error_ellipse(cov(y((numStimRepeats*3+1):(numStimRepeats*4),:)),[mean(y((n
 title('Combined Ventral ROI')
 xlabel('Dimension 1')
 ylabel('Dimension 2')
-legend('Grass','','Leaves','','Lemons','','Bananas','Acorns','Redwood','Petals','Buttercream')
+legend('Grass','','Leaves','','Lemons','','Bananas','Petals','Buttercream','Acorns','Redwood')
 
 
 
@@ -324,7 +329,7 @@ legend('Grass','','Leaves','','Lemons','','Bananas','Acorns','Redwood','Petals',
 endpointIndices = [1 6 7 12];
 colors = {'g','g','g','g','g','g',[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],[0.9290 0.6940 0.1250],...
     'm','m','m','m','m','m', [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840], [0.6350 0.0780 0.1840]};
-endpointNames = {'Grass', 'Leaves', 'Lemons', 'Bananas','Acorns','Redwood','Petals','Buttercream'};
+endpointNames = {'Grass', 'Leaves', 'Lemons', 'Bananas','Petals','Buttercream','Acorns','Redwood'};
 
 %plot the correlations OF ALL REPEATS with the other repeats from the endpoint conditions
 if showDistancesSingleTrials
@@ -400,8 +405,8 @@ end
 
 
 %% do maximum likelihood distance scaling on the averaged representation with voxels from all ROIs
-interpSets = {[1:6], [7:12]};
-%interpSets = {[1:6], [7:12], [13:18], [19:24]};
+%interpSets = {[1:6], [7:12]};
+interpSets = {[1:6], [7:12], [13:18], [19:24]};
 figure
 
 disp('Doing mlds - takes a minute or so.')
@@ -422,10 +427,10 @@ for repititions = 1:mldsReps
     for set = 1:length(interpSets)
     
         %simulate n draws of 4 images
-        numSamples = 10000;
+        numSamples = 1000;
         averagedInterps = cat(2, allBetasBigROIAveragedMlds{interpSets{set}});
         %can use either correlations or euclidean distance
-        corMatrix = corr(averagedInterps); %cosine di
+        corMatrix = corr(averagedInterps); %cosine distance
         %corMatrix = -pdist2(averagedInterps',averagedInterps'); %euclidean distance implementation
         %calculate which pair has a higher correlation
         ims = randi(6,4,numSamples);
@@ -441,7 +446,7 @@ for repititions = 1:mldsReps
         % set up initial params
         %psi = [0.5 0.5 0.5 0.5];
         psi = [.2 .4 .6 .8];
-        sigma = .5;
+        sigma = .2;
         initialParams = [psi, sigma];
         
         %options
@@ -472,6 +477,7 @@ for repititions = 1:mldsReps
         if set == 1; title('Grass to leaves mlds'); elseif set == 2, title('Lemons to bananas mlds'); elseif set == 3, title('Petals to buttercream mlds'); elseif set == 4, title('Acorns to redwood mlds'),end
     
         allPsi{set}{repititions} = psi;
+        allSigmas{set}{repititions} = psi(5);
     end
 end
 sgtitle(sprintf('MLDS, all %i voxels in all ROIs', sum(numUsableVoxelsByROI(roisToCombine))))
@@ -506,7 +512,7 @@ for roi = roisToCombine;
         for set = 1:length(interpSets)
         
             %simulate n draws of 4 images
-            numSamples = 10000;
+            numSamples = 1000;
             averagedInterps = cat(2, allBetasSingleROIAveragedMlds{interpSets{set}});
             corMatrix = corr(averagedInterps);
             ims = randi(6,4,numSamples);
@@ -522,9 +528,8 @@ for roi = roisToCombine;
             end
     
             % set up initial params
-            psi = [0.5 0.5 0.5 0.5];
-            %psi = [.2 .4 .6 .8];
-            sigma = .5;
+            psi = [0.2 0.4 0.6 0.8];
+            sigma = .2;
             initialParams = [psi, sigma];
             
             %options
@@ -554,6 +559,8 @@ for roi = roisToCombine;
             %ylabel('Neural interpolation value')
             title(roiNames{roi},sprintf('%i voxels',numUsableVoxelsByROI(roi)))
         
+            allPsiROIs{set}{roi}{repititions} = psi;
+            allSigmasROIs{set}{roi}{repititions} = psi(5);
         end
     end
     sub = sub+1;
@@ -563,7 +570,7 @@ sgtitle('MLDS, individual ROIs')
 
 
 
-%%this is using all ROIs EXCEPT the one you are indexing.
+%% this is using all ROIs EXCEPT the one you are indexing.
 figure, sub = 1;
 
 %iterate through different ROIs
@@ -590,8 +597,8 @@ for roi = roisToCombine;
         for set = 1:length(interpSets)
         
             %simulate n draws of 4 images
-            numSamples = 10000;
-            averagedInterps = cat(2, allBetasBigROILeaveout{interpSets{set}});
+            numSamples = 1000;
+            averagedInterps = cat(2, allBetasBigROIAveragedLeaveout{interpSets{set}});
             corMatrix = corr(averagedInterps);
             ims = randi(6,4,numSamples);
         
@@ -645,9 +652,33 @@ for roi = roisToCombine;
 end
 sgtitle('MLDS, LEAVING OUT individual ROIs')
 
+
 end
 
 
+%% compare the neuro MLDS curved to the behavioral ones
+figure, hold on
+behavioralSubject = 3;
+
+%make sure the psychophysics data are in order of the neuroimaging data
+PPtexNums = [2 3 5 1];
+disp('!!! The stimuli might be in different order in the behavior and neuroimaging data. Check that they are the same, and reorganize if you need to !!!')
+for i = 1:length(interpSets)
+    disp(strcat('Neuroimaging data: ', task{1}.stimfile.stimulus.interpNames{i}{1}, '_', task{1}.stimfile.stimulus.interpNames{i}{2}, ', behavioral data: ', PPdata.data.texNames{PPtexNums(i)}))
+end
+
+%load in the psychophysics group data
+PPdata = load('~/data/texMlds/texMldsGroupData.mat');
+
+%first, draw the comparisons between the voxel psi values and the behavioral psi values
+for set = 1:length(interpSets)
+    scatter(allPsi{set}{1}, PPdata.data.psi{behavioralSubject}{PPtexNums(set)}(1:2:end), 'filled', 'markerFaceColor', colors{max(interpSets{set})})
+end
+
+plot([0 1],[0 1],'k')
+xlim([-.05, 1.05]); ylim([-0.05, 1.05]);
+xlabel('Neuroimaging Psi value (all voxels)')
+ylabel('Behavioral Psi value')
 
 
 
@@ -749,7 +780,7 @@ function totalProb = computeLoss(params, ims, responses)
     end
     diffs = abs(ims(1,:)-ims(2,:)) - abs(ims(3,:)-ims(4,:));
     % count up probability
-    totalProb = 0;
+    totalProb = 1000;
     for responseNum = 1:length(diffs)
         if responses(responseNum) == 1
             probResponse = -log(normcdf(diffs(responseNum),0,sigma));
