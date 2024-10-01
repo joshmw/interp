@@ -10,7 +10,7 @@
 function mldsAnal(varargin)
 
 %set variables
-SIDnums = {'s600','s0601','s0602'}
+SIDnums = {'s600','s0601','s0602', 's0627'}
 %SIDnums = {'s600'}
 showImagesOnGraphs = 1; %display the actual images on the mlds curves
 bootstrap = 0; %binary: do you want to bootstrap?
@@ -40,7 +40,8 @@ for SIDnum = 1:length(SIDnums)
         [psi, PSE, mldsSigma, gaussSigma] = calcPlotGraphs(texName, texNames, task, showImagesOnGraphs, SUBnum, SIDnums, 0, 1, numSubplots);
         
         %put into a format that you can save out
-        data.psi{SIDnum}{texName} = psi; data.PSE{SIDnum}{texName} = PSE; data.mldsSigma{SIDnum}{texName} = mldsSigma; data.gaussSigma{SIDnum}{texName} = gaussSigma;
+        [texIndex, allTexNames] = getTexIndex(texNames(texName))
+        data.psi{SIDnum}{texIndex} = psi; data.PSE{SIDnum}{texIndex} = PSE; data.mldsSigma{SIDnum}{texIndex} = mldsSigma; data.gaussSigma{SIDnum}{texIndex} = gaussSigma;
 
         %if you are bootstrapping confidence intervals on psi...
         if bootstrap
@@ -72,15 +73,34 @@ for SIDnum = 1:length(SIDnums)
 end
 
 %save out a data file
-data.texNames = texNames;
+data.allTexNames = allTexNames;
 data.SIDnums = SIDnums;
 data.guide = 'Data are organized by {subject}{interp family}. Subject IDs and interp names are stored as SIDnums and texNames.'
 
 keyboard
 %end function
+%save(data,'~/data/texMlds/texMldsGroupData.mat')
 end
 
 
+
+%%%%%%%%%%%%%
+%% getTexIndex %%
+%%%%%%%%%%%%%
+function [texIndex, allTexNames] = getTexIndex(texInput)
+
+% define the names of all the textures you might want to see
+allTexNames = ["acorns_redwood", "grass_leaves", "lemons_bananas", "pebbles_granite", "petals_buttercream"]
+% get the index of the one you are on
+texIndex = find(allTexNames == texInput);
+
+%error if the psychophysics texture isn't being tracked
+if isempty(texIndex)
+    sprintf('%s is not being tracked in the broader save file. please add.', texInput)
+    keybord
+end
+
+end %end function
 
 
 %%%%%%%%%%%%%
@@ -131,8 +151,9 @@ PSE = gaussFit.mean;
 gaussSigma = gaussFit.std;
 
 if plotFunctions
+    [texIndex] = getTexIndex(texNames(texName))
     %plot data
-    figure(texName), subplot(numSubplots,2,SUBnum), hold on
+    figure(texIndex), subplot(numSubplots,2,SUBnum), hold on
     plot((0:.1:1), psi,'k')
     xlabel('Interp value')
     ylabel('Perceptual distance')
