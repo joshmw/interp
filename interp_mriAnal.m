@@ -8,7 +8,7 @@ function interp_mriAnal(varargin)
 %  Date: 04/16/2024
 %
 %  Arguments:
-%    reliability_cutoff: split-half correlation of betas used to select voxels for analysis
+%    reliabilityCutoff: split-half correlation of betas used to select voxels for analysis
 %    r2cutoff: r2 cutoff (from glmsingle) used to select voxels for analysis
 %    stdCutoff: remove voxels whos betas in any single condition have a standard deviation higher than this value
 %    shuffleData: set to 1 to randomize condition labels in the very beginning (control measure)
@@ -28,7 +28,7 @@ function interp_mriAnal(varargin)
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliability_cutoff=.5', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=4' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=0,'...
+getArgs(varargin, {'reliabilityCutoff=.25', 'r2cutoff=0', 'stdCutoff=5', 'shuffleData=0', 'zscorebetas=2', 'numBoots=250', 'nVoxelsNeeded=30' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'numBetasEachScan=48', 'numScansInGLM=20', 'numStimRepeats=40','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE roi's should be responsive
@@ -147,7 +147,7 @@ end
 for taskNum = 1:2
     for roi = 1:length(task{taskNum}.roiNames);
         %face responses
-        task{taskNum}.averagedBetas{roi} = task{taskNum}.averaged_amplitudes((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliability_cutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),:);
+        task{taskNum}.averagedBetas{roi} = task{taskNum}.averaged_amplitudes((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),:);
     end
 end
 
@@ -217,7 +217,7 @@ for taskNum = 1:2
     for roi = 1:length(roiNames);
         for condition = 1:length(task{1}.stimNames);
         %get betas for individual trials, filtering by reliability
-            allBetas{taskNum}{roi}{condition} = task{taskNum}.betas((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliability_cutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),task{taskNum}.trial_conditions==condition);
+            allBetas{taskNum}{roi}{condition} = task{taskNum}.betas((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),task{taskNum}.trial_conditions==condition);
         end
     end
 end
@@ -450,7 +450,7 @@ for repititions = 1:mldsReps
         initialParams = [psi, sigma];
         
         %options
-        options = optimset('fminsearch'); options.MaxFunEvals = 10000; options.MinFunEvals = 0; options.MaxIter = 5000;
+        options = optimset('fminsearch'); options.MaxFunEvals = 10000; options.MaxIter = 5000; options.Display = 'off';
         %options.TolFun = .0001;
         
         %search for params
@@ -532,10 +532,6 @@ for roi = roisToCombine;
             sigma = .2;
             initialParams = [psi, sigma];
             
-            %options
-            options = optimset('fminsearch'); options.MaxFunEvals = 10000; options.MinFunEvals = 0; options.MaxIter = 5000;
-            %options.TolFun = .0001;
-            
             %search for params
             optimalParams = fminsearch(@(params) computeLoss(params, ims, responses), initialParams, options);
             psi = [0 optimalParams(1:4) 1];
@@ -613,14 +609,10 @@ for roi = roisToCombine;
             end
     
             % set up initial params
-            psi = [0.5 0.5 0.5 0.5];
+            psi = [0.2 0.4 0.6 0.8];
             %psi = [.2 .4 .6 .8];
             sigma = .5;
             initialParams = [psi, sigma];
-            
-            %options
-            options = optimset('fminsearch'); options.MaxFunEvals = 10000; options.MinFunEvals = 0; options.MaxIter = 5000;
-            %options.TolFun = .0001;
             
             %search for params
             optimalParams = fminsearch(@(params) computeLoss(params, ims, responses), initialParams, options);
@@ -654,21 +646,21 @@ sgtitle('MLDS, LEAVING OUT individual ROIs')
 
 
 end
+keyboard
 
-
-%% compare the neuro MLDS curved to the behavioral ones
+%% compare the neuro MLDS values (all voxels combined) to the behavioral ones
 figure, hold on
-behavioralSubject = 3;
+behavioralSubject = 2;
+
+%load in the psychophysics group data
+PPdata = load('~/data/texMlds/texMldsGroupData.mat');
 
 %make sure the psychophysics data are in order of the neuroimaging data
 PPtexNums = [2 3 5 1];
 disp('!!! The stimuli might be in different order in the behavior and neuroimaging data. Check that they are the same, and reorganize if you need to !!!')
 for i = 1:length(interpSets)
-    disp(strcat('Neuroimaging data: ', task{1}.stimfile.stimulus.interpNames{i}{1}, '_', task{1}.stimfile.stimulus.interpNames{i}{2}, ', behavioral data: ', PPdata.data.texNames{PPtexNums(i)}))
+    disp(strcat('Neuroimaging data: ', task{1}.stimfile.stimulus.interpNames{i}{1}, '_', task{1}.stimfile.stimulus.interpNames{i}{2}, ', behavioral data: ', PPdata.data.allTexNames{PPtexNums(i)}))
 end
-
-%load in the psychophysics group data
-PPdata = load('~/data/texMlds/texMldsGroupData.mat');
 
 %first, draw the comparisons between the voxel psi values and the behavioral psi values
 for set = 1:length(interpSets)
@@ -680,6 +672,26 @@ xlim([-.05, 1.05]); ylim([-0.05, 1.05]);
 xlabel('Neuroimaging Psi value (all voxels)')
 ylabel('Behavioral Psi value')
 
+
+%% compare the neuro MLDS values (INDIVIDUAL ROIS) to the behavioral ones
+if doROImlds
+    figure, hold on
+    
+    %first, draw the comparisons between the voxel psi values and the behavioral psi values
+    for set = 1:length(interpSets)
+        for roi = 1:length(roisToCombine)
+            subplot(3, ceil(length(roisToCombine)/3), roi), hold on
+            scatter(allPsiROIs{set}{roisToCombine(roi)}{1}, PPdata.data.psi{behavioralSubject}{PPtexNums(set)}(1:2:end), 'filled', 'markerFaceColor', colors{max(interpSets{set})})
+            plot([0 1],[0 1],'k')
+            title(roiNames{roisToCombine(roi)})
+            xlim([-.05, 1.05]); ylim([-0.05, 1.05]);
+        end
+    
+    end
+    
+    xlabel('Neuroimaging Psi value (all voxels)')
+    ylabel('Behavioral Psi value')
+end
 
 
 
@@ -830,7 +842,6 @@ function totalProb = computeLoss(params, ims, responses)
 % should try with different voxel cutoffs but for now it's shit
 
 % %% do mlds on UNAVERAGED representations
-% interpSets = {[1:6], [7:12]};
 % figure
 % 
 % disp('Doing mlds - takes a minute or so.')
