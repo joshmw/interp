@@ -705,13 +705,18 @@ for set = 1:length(interpSets)
     data = [allBetasBigROI{end1}'; allBetasBigROI{end2}'];
     labels = [repmat(0,1,numStimRepeats) repmat(1,1,numStimRepeats)];
     %fit it
-    svm = fitcsvm(data,labels);
+    numFolds = 5;
+    svm = fitcsvm(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
     
     %plot the results of different interpolation classifications
     subplot(1,4,set), hold on
     numEndpoint2 = [];
     for interp = cell2mat(interpSets(set));
-        numEndpoint2 = [numEndpoint2 mean(svm.predict(allBetasBigROI{interp}'))];
+        percentCat1 = [];
+        for fold = 1:numFolds
+            percentCat1(fold) = mean(svm.Trained{fold}.predict(allBetasBigROI{interp}'));
+        end
+        numEndpoint2 = [numEndpoint2 mean(percentCat1)];
     end
     scatter(cell2mat(interpSets(1)),numEndpoint2,'filled','markerFaceColor',colors{max(interpSets{set})});
     %equality line
@@ -737,12 +742,16 @@ for roi = roisToCombine;
         data = [allBetasCombinedFiltered{roi}{end1}'; allBetasCombinedFiltered{roi}{end2}'];
         labels = [repmat(0,1,numStimRepeats) repmat(1,1,numStimRepeats)];
         %fit it
-        svm = fitcsvm(data,labels);
+        svm = fitcsvm(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
         
         %plot the results of different interpolation classifications
         numEndpoint2 = [];
         for interp = cell2mat(interpSets(set));
-            numEndpoint2 = [numEndpoint2 mean(svm.predict(allBetasCombinedFiltered{roi}{interp}'))];
+            percentCat1 = [];
+            for fold = 1:numFolds
+                percentCat1(fold) = mean(svm.Trained{fold}.predict(allBetasCombinedFiltered{roi}{interp}'));
+            end
+            numEndpoint2 = [numEndpoint2 mean(percentCat1)];
         end
         %plot
         subplot(4,numSubs,(set-1)*length(roisToCombine) + sub), hold on
