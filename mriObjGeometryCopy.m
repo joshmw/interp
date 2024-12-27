@@ -203,7 +203,7 @@ title('Beta weights')
 
  
 
-%% process data for mds
+%% process data - filter by reliability, combined hemis
 %first, get all of the betas for individual stim types for rois
 for taskNum = 1:2
     for roi = 1:length(roiNames);
@@ -231,6 +231,7 @@ for roi = 1:length(roiNames)
 end
 
 %filter out voxels that are really noisy (high std in betas for repeats)
+%YOU DON'T NEED TO DO THIS IS Z-SCORING! which you should be doing. just set stdCutoff to high (>5) and it wont do anything.
 for roi = 1:length(roiNames)
     for stim = 1:length(task{1}.stimNames)
         allBetasCombinedFiltered{roi}{stim} = allBetasCombined{roi}{stim}(voxelStd{roi} < stdCutoff,:);
@@ -303,12 +304,12 @@ legend(stimNames);
 
 
 
-%% look at the RSMs of different stimuli
+%% look at the RSMs in individual ROIs
 figure
 for roi = roisToCombine;
     averagedReps = zeros(length(stimNames), numUsableVoxelsByROI(roi));
     for stim = 1:length(task{1}.stimNames);
-        averageStim =  median(allBetasCombinedFiltered{roi}{stim},2);
+        averageStim =  mean(allBetasCombinedFiltered{roi}{stim},2);
         averagedReps(stim,:) = averageStim;
     end
 
@@ -322,35 +323,7 @@ end
 sgtitle('RSMs for all simuli in different areas')
 
 
-
-%% do the same for a big ROI, combining all the small ROIS
-%combine into a big ROI
-for stim = 1:length(task{1}.stimNames);
-    allBetasBigROI{stim} = [];
-    for roi = roisToCombine
-        allBetasBigROI{stim} = [allBetasBigROI{stim}; allBetasCombinedFiltered{roi}{stim}];
-    end
-end
-
-averagedReps = zeros(length(stimNames), size(allBetasBigROI{1},1));
-for stim = 1:length(task{1}.stimNames);
-    averageStim =  median(allBetasBigROI{stim},2);
-    averagedReps(stim,:) = averageStim;
-end
-
-allBetasBigROIAveraged = averagedReps;
-
-figure
-RSM = corr(averagedReps');
-imagesc(RSM),
-colorbar, caxis([-1 1])
-title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
-xlabel('Object number'), ylabel('Object number')
-
-
-
-
-%% classification - train an SVM on the n-way classification task (number of stimuli types)
+%% classification in individual ROIs - train an SVM on the n-way classification task (number of stimuli types)
 figure
 for roi = roisToCombine
     %create data and labels
@@ -366,107 +339,251 @@ for roi = roisToCombine
     predictions = kfoldPredict(svm);
     %plot confusion
     subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)),
-    confusionchart(predictions,labels, 'Normalization', 'row-normalized')
+    confusionchart(labels, predictions, 'Normalization', 'column-normalized')
     title(roiNames(roi))
 end
 
 
 
 
-%% classification on big roi
-figure, subplot(2,2,1)
-%create data and labels
-data = cell2mat(allBetasBigROI)';
-labels = repelem(1:length(stimNames), numStimRepeats);
-[data, labels] = shuffleDataLabelOrder(data, labels);
-%fit svm
-numFolds = 5;
-svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-% eval
-cvLoss = kfoldLoss(svm); % Cross-validated classification error
-disp(['Cross-validated loss: ', num2str(cvLoss)]);
-predictions = kfoldPredict(svm);
-chart = confusionchart(predictions,labels, 'Normalization', 'row-normalized')
-title(sprintf('All ROIs confusion chart: %0.2f accuracy', 1-cvLoss))
 
-RSMconfusionCorr = corr(RSM(RSM<1),chart.NormalizedValues(RSM<1));
-sprintf('Correlation between confusion chart and RSM: %0.3f', RSMconfusionCorr)
+%% Make different averaged ROIs. 
+%big roi - all ROIs to combine.
+for stim = 1:length(task{1}.stimNames);
+    allBetasBigROI{stim} = [];
+    for roi = roisToCombine
+        allBetasBigROI{stim} = [allBetasBigROI{stim}; allBetasCombinedFiltered{roi}{stim}];
+    end
+end
 
-
-%% classification on EVC roi
-subplot(2,2,2)
-%make the roi
+% early visual cortex ROI (v1 and v2)
+earlyROIs = [1 3];
 for stim = 1:length(task{1}.stimNames);
     allBetasEVCROI{stim} = [];
-    for roi = [1 3]
+    for roi = earlyROIs
         allBetasEVCROI{stim} = [allBetasEVCROI{stim}; allBetasCombinedFiltered{roi}{stim}];
     end
 end
 
-%create data and labels
-data = cell2mat(allBetasEVCROI)';
-labels = repelem(1:length(stimNames), numStimRepeats);
-[data, labels] = shuffleDataLabelOrder(data, labels);
-%fit svm
-svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-% eval
-cvLoss = kfoldLoss(svm); % Cross-validated classification error
-disp(['Cross-validated loss: ', num2str(cvLoss)]);
-predictions = kfoldPredict(svm);
-confusionchart(predictions,labels, 'Normalization', 'row-normalized')
-title(sprintf('Early visual confusion chart: %0.2f accuracy', 1-cvLoss))
-
-
-
-%% classification on MVC roi
-subplot(2,2,3)
-%make the roi
+% mid-visual cortex ROIS (v3, v4, etc)
+midROIs = [5 7 9 11 17 19];
 for stim = 1:length(task{1}.stimNames);
     allBetasMVCROI{stim} = [];
-    for roi = [5 7 9 11 17 19]
+    for roi = midROIs
         allBetasMVCROI{stim} = [allBetasMVCROI{stim}; allBetasCombinedFiltered{roi}{stim}];
     end
 end
 
-%create data and labels
-data = cell2mat(allBetasMVCROI)';
-labels = repelem(1:length(stimNames), numStimRepeats);
-[data, labels] = shuffleDataLabelOrder(data, labels);
-%fit svm
-svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-% eval
-cvLoss = kfoldLoss(svm); % Cross-validated classification error
-disp(['Cross-validated loss: ', num2str(cvLoss)]);
-predictions = kfoldPredict(svm);
-confusionchart(predictions,labels, 'Normalization', 'row-normalized')
-title(sprintf('Mid-level visual confusion chart: %0.2f accuracy', 1-cvLoss))
-
-
-%% classification on VVS roi
-subplot(2,2,4)
-%make the roi
+% "late" visual ROIs (IT, FFA, LO, etc).
+lateROIs = [19 21 23 25 27 29 31 33 39 43 45 47 49 53];
 for stim = 1:length(task{1}.stimNames);
     allBetasVVSROI{stim} = [];
-    for roi = [19 21 23 25 27 29 31 33 39 43 45 47 49 53]
+    for roi = lateROIs
         allBetasVVSROI{stim} = [allBetasVVSROI{stim}; allBetasCombinedFiltered{roi}{stim}];
     end
 end
 
-%create data and labels
-data = cell2mat(allBetasVVSROI)';
-labels = repelem(1:length(stimNames), numStimRepeats);
-[data, labels] = shuffleDataLabelOrder(data, labels);
-%fit svm
-svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-% eval
-cvLoss = kfoldLoss(svm); % Cross-validated classification error
-disp(['Cross-validated loss: ', num2str(cvLoss)]);
-predictions = kfoldPredict(svm);
-confusionchart(predictions,labels, 'Normalization', 'row-normalized')
-title(sprintf('VVS confusion chart: %0.2f accuracy', 1-cvLoss))
 
 
 
+%% Make RSMS for all rois, EVC rois, MVC rois, and VVS rois.
+% RSM of the big ROI, combining all the small ROIS
+    %create empty matrices
+    averagedReps = zeros(length(stimNames), size(allBetasBigROI{1},1));
+    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
+    
+    %go through and add each averaged stimulus response to the empty average matrix
+    for stim = 1:length(task{1}.stimNames);
+        %get the average of each of the halves of the stimuli (even or odds)
+        averagedRepsHalf1(stim,:) = mean(allBetasBigROI{stim}(:,1:2:end),2);
+        averagedRepsHalf2(stim,:) = mean(allBetasBigROI{stim}(:,2:2:end),2);
+    end
+    
+    %rename everything according to earlier convention
+    allBetasBigROIAveragedHalf1 = averagedRepsHalf1; allBetasBigROIAveragedHalf2 = averagedRepsHalf2;
+    
+    %make the RSM using halves.
+    half1 = corr(allBetasBigROIAveragedHalf1', allBetasBigROIAveragedHalf2');
+    half2 = corr(allBetasBigROIAveragedHalf2', allBetasBigROIAveragedHalf1');
+    RSM = (half1+half2)/2;
+    
+    %plot it
+    figure, subplot(2,2,1), imagesc(RSM),
+    colormap(redbluecmap), colorbar, caxis([-1 1])
+    title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
+    xlabel('Object number'), ylabel('Object number')
+
+
+
+% RSM of the EVC ROI
+    %create empty matrices
+    averagedReps = zeros(length(stimNames), size(allBetasEVCROI{1},1));
+    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
+    
+    %go through and add each averaged stimulus response to the empty average matrix
+    for stim = 1:length(task{1}.stimNames);
+        %get the average of each of the halves of the stimuli (even or odds)
+        averagedRepsHalf1(stim,:) = mean(allBetasEVCROI{stim}(:,1:2:end),2);
+        averagedRepsHalf2(stim,:) = mean(allBetasEVCROI{stim}(:,2:2:end),2);
+    end
+    
+    %rename everything according to earlier convention
+    allBetasEVCROIAveragedHalf1 = averagedRepsHalf1; allBetasEVCROIAveragedHalf2 = averagedRepsHalf2;
+    
+    %make the RSM using halves.
+    half1 = corr(allBetasEVCROIAveragedHalf1', allBetasEVCROIAveragedHalf2');
+    half2 = corr(allBetasEVCROIAveragedHalf2', allBetasEVCROIAveragedHalf1');
+    EVCRSM = (half1+half2)/2;
+    
+    %plot it
+    subplot(2,2,2), imagesc(EVCRSM),
+    colormap(redbluecmap), colorbar, caxis([-1 1])
+    title('RSM: EVC. Correlation between averaged patterns of activity')
+    xlabel('Object number'), ylabel('Object number')
+
+
+
+% RSM of the mid ROI
+    %create empty matrices
+    averagedReps = zeros(length(stimNames), size(allBetasMVCROI{1},1));
+    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
+    
+    %go through and add each averaged stimulus response to the empty average matrix
+    for stim = 1:length(task{1}.stimNames);
+        %get the average of each of the halves of the stimuli (even or odds)
+        averagedRepsHalf1(stim,:) = mean(allBetasMVCROI{stim}(:,1:2:end),2);
+        averagedRepsHalf2(stim,:) = mean(allBetasMVCROI{stim}(:,2:2:end),2);
+    end
+    
+    %rename everything according to earlier convention
+    allBetasMVCROIAveragedHalf1 = averagedRepsHalf1; allBetasMVCROIAveragedHalf2 = averagedRepsHalf2;
+    
+    %make the RSM using halves.
+    half1 = corr(allBetasMVCROIAveragedHalf1', allBetasMVCROIAveragedHalf2');
+    half2 = corr(allBetasMVCROIAveragedHalf2', allBetasMVCROIAveragedHalf1');
+    MVCRSM = (half1+half2)/2;
+    
+    %plot it
+    subplot(2,2,3), imagesc(MVCRSM),
+    colormap(redbluecmap), colorbar, caxis([-1 1])
+    title('RSM: MVC. Correlation between averaged patterns of activity')
+    xlabel('Object number'), ylabel('Object number')
+
+
+% RSM of the VVC ROI
+    %create empty matrices
+    averagedReps = zeros(length(stimNames), size(allBetasVVSROI{1},1));
+    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
+    
+    %go through and add each averaged stimulus response to the empty average matrix
+    for stim = 1:length(task{1}.stimNames);
+        %get the average of each of the halves of the stimuli (even or odds)
+        averagedRepsHalf1(stim,:) = mean(allBetasVVSROI{stim}(:,1:2:end),2);
+        averagedRepsHalf2(stim,:) = mean(allBetasVVSROI{stim}(:,2:2:end),2);
+    end
+    
+    %rename everything according to earlier convention
+    allBetasVVSROIAveragedHalf1 = averagedRepsHalf1; allBetasVVSROIAveragedHalf2 = averagedRepsHalf2;
+    
+    %make the RSM using halves.
+    half1 = corr(allBetasVVSROIAveragedHalf1', allBetasVVSROIAveragedHalf2');
+    half2 = corr(allBetasVVSROIAveragedHalf2', allBetasVVSROIAveragedHalf1');
+    VVSRSM = (half1+half2)/2;
+    
+    %plot it
+    subplot(2,2,4), imagesc(VVSRSM),
+    colormap(redbluecmap), colorbar, caxis([-1 1])
+    title('RSM: VVS. Correlation between averaged patterns of activity')
+    xlabel('Object number'), ylabel('Object number')
+
+
+
+
+%% classification on the different ROIs (all, early, middle, late)
+
+% classification on big roi
+    figure, subplot(2,2,1)
+    %create data and labels
+    data = cell2mat(allBetasBigROI)';
+    labels = repelem(1:length(stimNames), numStimRepeats);
+    [data, labels] = shuffleDataLabelOrder(data, labels);
+    %fit svm
+    numFolds = 5;
+    svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+    % eval
+    cvLoss = kfoldLoss(svm); % Cross-validated classification error
+    disp(['Cross-validated loss: ', num2str(cvLoss)]);
+    predictions = kfoldPredict(svm);
+    allROIsConfusionChart = confusionchart(labels, predictions, 'Normalization', 'column-normalized');
+    title(sprintf('All ROIs confusion chart: %0.2f accuracy', 1-cvLoss))
+    
+    RSMconfusionCorr = corr(RSM(RSM<1),allROIsConfusionChart.NormalizedValues(RSM<1));
+    sprintf('Correlation between confusion chart and RSM: %0.3f', RSMconfusionCorr)
+
+
+% classification on EVC roi
+    subplot(2,2,2)
+    %create data and labels
+    data = cell2mat(allBetasEVCROI)';
+    labels = repelem(1:length(stimNames), numStimRepeats);
+    [data, labels] = shuffleDataLabelOrder(data, labels);
+    %fit svm
+    svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+    % eval
+    cvLoss = kfoldLoss(svm); % Cross-validated classification error
+    disp(['Cross-validated loss: ', num2str(cvLoss)]);
+    predictions = kfoldPredict(svm);
+    confusionchart(labels, predictions, 'Normalization', 'column-normalized')
+    title(sprintf('Early visual confusion chart: %0.2f accuracy', 1-cvLoss))
+
+
+% classification on MVC roi
+    subplot(2,2,3)
+    %create data and labels
+    data = cell2mat(allBetasMVCROI)';
+    labels = repelem(1:length(stimNames), numStimRepeats);
+    [data, labels] = shuffleDataLabelOrder(data, labels);
+    %fit svm
+    svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+    % eval
+    cvLoss = kfoldLoss(svm); % Cross-validated classification error
+    disp(['Cross-validated loss: ', num2str(cvLoss)]);
+    predictions = kfoldPredict(svm);
+    confusionchart(labels, predictions, 'Normalization', 'column-normalized')
+    title(sprintf('Mid-level visual confusion chart: %0.2f accuracy', 1-cvLoss))
+
+
+% classification on VVS roi
+    subplot(2,2,4)
+    %create data and labels
+    data = cell2mat(allBetasVVSROI)';
+    labels = repelem(1:length(stimNames), numStimRepeats);
+    [data, labels] = shuffleDataLabelOrder(data, labels);
+    %fit svm
+    svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+    % eval
+    cvLoss = kfoldLoss(svm); % Cross-validated classification error
+    disp(['Cross-validated loss: ', num2str(cvLoss)]);
+    predictions = kfoldPredict(svm);
+    confusionchart(labels, predictions, 'Normalization', 'column-normalized')
+    title(sprintf('VVS confusion chart: %0.2f accuracy', 1-cvLoss))
+
+
+
+
+%% plot the correlation between the confusion matrix and RSMs
+figure,
+chartValues = allROIsConfusionChart.NormalizedValues;
+scatter(RSM(RSM<1),chartValues(RSM<1));
+xlabel('Cosine similarity (correlation between averaged responses)')
+ylabel('Confusion values (n-way SVM)')
+title('Cosine similarity and SVM confusibility (measure of seperation)')
+
+
+
+
+
+%%
 
 
 keyboard
