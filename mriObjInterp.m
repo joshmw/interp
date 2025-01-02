@@ -1,4 +1,4 @@
-function interp_mriAnal(varargin)
+function mriObjInterp(varargin)
 % interp_mriAnal.m
 %
 %  Takes the outputs of 'run_glmDenoiseInterp.m' (results) and does analyses.
@@ -28,7 +28,7 @@ function interp_mriAnal(varargin)
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliabilityCutoff=.4', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=.35', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
@@ -38,6 +38,7 @@ getArgs(varargin, {'reliabilityCutoff=.4', 'r2cutoff=0', 'stdCutoff=100', 'shuff
 cd('~/data/interp/s0603/')
 task{1} = load('s0603Task1.mat');
 task{2} = load('s0603Task2.mat');
+interpSets = {[1:6], [7:12], [13:18], [19:24]};
 
 
 %fix the stim names thing - remove the duplicate of the blanks (in this case, 1 8 15 22
@@ -511,7 +512,6 @@ R2 = 1 - sum((y - y_fit).^2) / sum((y - mean(y)).^2);
 plot(y_fit)
 
 
-keyboard
 
 %% Make RSMS for all rois, EVC rois, MVC rois, and VVS rois.
 % RSM of the big ROI, combining all the small ROIS
@@ -532,10 +532,10 @@ keyboard
     %make the RSM using halves.
     half1 = corr(allBetasBigROIAveragedHalf1', allBetasBigROIAveragedHalf2');
     half2 = corr(allBetasBigROIAveragedHalf2', allBetasBigROIAveragedHalf1');
-    RSM = (half1+half2)/2;
+    BigROIRSM = (half1+half2)/2;
     
     %plot it
-    figure, subplot(2,2,1), imagesc(RSM),
+    figure, subplot(2,2,1), imagesc(BigROIRSM),
     colormap(hot), colorbar, caxis([-1 1])
     title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
     xlabel('Object number'), ylabel('Object number')
@@ -633,11 +633,52 @@ keyboard
 
 
 
+%% averge the RSMs of the individual interpolations together
+
+%first, averge the RSMS
+BigROIRSMAveraged = zeros(length(interpSets{1}), length(interpSets{1}));
+for set = 1:length(interpSets)
+    BigROIRSMAveraged = BigROIRSMAveraged + BigROIRSM(interpSets{set},interpSets{set});
+end
+
+EVCRSMAveraged = zeros(length(interpSets{1}), length(interpSets{1}));
+for set = 1:length(interpSets)
+    EVCRSMAveraged = EVCRSMAveraged + EVCRSM(interpSets{set},interpSets{set});
+end
+
+MVCRSMAveraged = zeros(length(interpSets{1}), length(interpSets{1}));
+for set = 1:length(interpSets)
+    MVCRSMAveraged = MVCRSMAveraged + MVCRSM(interpSets{set},interpSets{set});
+end
+
+VVSRSMAveraged = zeros(length(interpSets{1}), length(interpSets{1}));
+for set = 1:length(interpSets)
+    VVSRSMAveraged = VVSRSMAveraged + VVSRSM(interpSets{set},interpSets{set});
+end
+
+%plot them
+figure
+subplot(2,2,1), imagesc(BigROIRSMAveraged), colormap(hot), colorbar, caxis([-1 1])
+title('RSM: All voxels'), xlabel('Interpolation number'), ylabel('Interpolation number')
+
+subplot(2,2,2), imagesc(EVCROIRSMAveraged), colormap(hot), colorbar, caxis([-1 1])
+title('RSM: EVC Voxels'), xlabel('Interpolation number'), ylabel('Interpolation number')
+
+subplot(2,2,3), imagesc(MVCROIRSMAveraged), colormap(hot), colorbar, caxis([-1 1])
+title('RSM: Mid-level voxels'), xlabel('Object number'), ylabel('Interpolation number')
+
+subplot(2,2,4), imagesc(VVSROIRSMAveraged), colormap(hot), colorbar, caxis([-1 1])
+title('RSM: VVS voxels'), xlabel('Object number'), ylabel('Interpolation number')
+
+sgtitle('RSMs, averaged over all interpolated stimulus sets')
+
+
 
 %% do mlds in different regions
+
 %do EVC
 figure
-doMLDS(allBetasEVCROIAveraged, mldsReps, colors, task)
+doMLDS(allBetasEVCROIAveraged, mldsReps, colors, task, interpSets)
 sgtitle('EVC mlds')
 
 %do MVC
@@ -651,43 +692,24 @@ doMLDS(allBetasVVSROIAveraged, mldsReps, colors, task)
 sgtitle('VVS mlds')
 
 
-
-
-
-%% classification - train an SVM on the endpoints and see how it predicts the interpolations
+%% classification
+%classify EVC
 figure
-interpSets = {[1:6], [7:12], [13:18], [19:24]};
-for set = 1:length(interpSets)
-    %define endpoints
-    end1 = min(cell2mat(interpSets(set))); end2 = max(cell2mat(interpSets(set)));
-    %get data for SVM
-    data = [allBetasBigROI{end1}'; allBetasBigROI{end2}'];
-    labels = [repmat(0,1,numStimRepeats) repmat(1,1,numStimRepeats)];
-    %fit it
-    numFolds = 5;
-    svm = fitcsvm(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-    
-    %plot the results of different interpolation classifications
-    subplot(1,4,set), hold on
-    numEndpoint2 = [];
-    for interp = cell2mat(interpSets(set));
-        percentCat1 = [];
-        for fold = 1:numFolds
-            percentCat1(fold) = mean(svm.Trained{fold}.predict(allBetasBigROI{interp}'));
-        end
-        numEndpoint2 = [numEndpoint2 mean(percentCat1)];
-    end
-    scatter(cell2mat(interpSets(1)),numEndpoint2,'filled','markerFaceColor',colors(max(interpSets{set}),:));
-    %equality line
-    plot([1 6], [0 1],'k','lineStyle','--')
-    gaussFit = fitCumulativeGaussian(1:6,        numEndpoint2);
-    plot(gaussFit.fitX,gaussFit.fitY,'color',colors(max(interpSets{set}),:))
-    scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
-    xlabel('Interpolation value')
-    ylabel('Percent classified as endpoint 2')
-    if set == 1; title('Grass to leaves'); elseif set == 2, title('Lemons to bananas'); elseif set == 3, title('Petals to buttercream'); elseif set == 4, title('Acorns to redwood'),end
-end
-sgtitle(sprintf('Classification using all %i voxels', sum(numUsableVoxelsByROI(roisToCombine))))
+doClassification(allBetasEVCROI, colors, task, numStimRepeats, interpSets)
+sgtitle('Classification: EVC')
+
+%classify MVC
+figure
+doClassification(allBetasMVCROI, colors, task, numStimRepeats, interpSets)
+sgtitle('Classification: MVC')
+
+
+%classify EVVS
+figure
+doClassification(allBetasVVSROI, colors, task, numStimRepeats, interpSets)
+sgtitle('Classification: VVS')
+
+
 
 
 
@@ -735,17 +757,49 @@ keyboard
 %%%%%%%%%
 function drawLines
     hold on
-    plot([.5 24.5], [6.5 6.5], 'k'), plot([.5 24.5], [12.5 12.5], 'k'), plot([.5 24.5], [18.8 18.5], 'k')
+    plot([.5 24.5], [6.5 6.5], 'k'), plot([.5 24.5], [12.5 12.5], 'k'), plot([.5 24.5], [18.5 18.5], 'k')
     plot([6.5 6.5], [.5 24.5], 'k'), plot([12.5 12.5], [.5 24.5], 'k'), plot([18.5 18.5], [.5 24.5], 'k'),
+
+
+
+%% classification - train an SVM on the endpoints and see how it predicts the interpolations
+function doClassification(classificationVoxels, colors, task, numStimRepeats, interpSets)
+    for set = 1:length(interpSets)
+        %define endpoints
+        end1 = min(cell2mat(interpSets(set))); end2 = max(cell2mat(interpSets(set)));
+        %get data for SVM
+        data = [classificationVoxels{end1}'; classificationVoxels{end2}'];
+        labels = [repmat(0,1,numStimRepeats) repmat(1,1,numStimRepeats)];
+        %fit it
+        numFolds = 5;
+        svm = fitcsvm(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+        
+        %plot the results of different interpolation classifications
+        subplot(1,4,set), hold on
+        numEndpoint2 = [];
+        for interp = cell2mat(interpSets(set));
+            percentCat1 = [];
+            for fold = 1:numFolds
+                percentCat1(fold) = mean(svm.Trained{fold}.predict(classificationVoxels{interp}'));
+            end
+            numEndpoint2 = [numEndpoint2 mean(percentCat1)];
+        end
+        scatter(cell2mat(interpSets(1)),numEndpoint2,'filled','markerFaceColor',colors(max(interpSets{set}),:));
+        %equality line
+        plot([1 6], [0 1],'k','lineStyle','--')
+        gaussFit = fitCumulativeGaussian(1:6,        numEndpoint2);
+        plot(gaussFit.fitX,gaussFit.fitY,'color',colors(max(interpSets{set}),:))
+        scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
+        xlabel('Interpolation value')
+        ylabel('Percent classified as endpoint 2')
+        title(strcat(task{1}.stimfile.stimulus.interpNames{set}{1}, ' --> ', task{1}.stimfile.stimulus.interpNames{set}{2}))
+    end
 
 
 
 
 %% do maximum likelihood distance scaling on the averaged representation with voxels from all ROIs
-function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task)
-   %interpSets = {[1:6], [7:12]};
-    interpSets = {[1:6], [7:12], [13:18], [19:24]};
-    
+function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSets)    
     disp('Doing mlds - takes a minute or so.')
     %iterate through different interps
     for repititions = 1:mldsReps
