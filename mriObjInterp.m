@@ -26,9 +26,9 @@ function mriObjInterp(varargin)
 
 
 
-%% Load the data
+%% LOAD THE DATA
 %get args
-getArgs(varargin, {'reliabilityCutoff=.4', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=.35', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
@@ -84,7 +84,7 @@ for taskNum = 1:2,
 end
 
 
-%% zscore and average some
+%% ZSCORE THE DATA AND GET AVERAGE AMPLITUDE VALUE
 for taskNum = 1:2
     %get betas
     task{taskNum}.amplitudes = squeeze(task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd);
@@ -104,7 +104,7 @@ for taskNum = 1:2
 end
 
 
-%% calculate the reliability of individual voxels (consistancy of beta values across presentations)
+%% CALCULATE THE RELIABILITY OF INDIVIDUAL VOXELS (CONSISTENCY OF BETA VALUES ACROSS PRESENTATIONS)
 for taskNum = 1:2;
     task{taskNum}.betas = task{taskNum}.amplitudes;
     wb = waitbar(0, 'Starting reliability bootstraps');
@@ -138,7 +138,7 @@ end
 
 
 
-%% partition by roi and filter by voxel reliability
+%% PARTITION BY ROI AND FILTER BY VOXEL RELIABILITY
 for taskNum = 1:2
     for roi = 1:length(task{taskNum}.roiNames);
         %face responses
@@ -153,7 +153,7 @@ end
 
 
 
-%% plot split half reliability, R2, and beta amplitudes by ROI
+%% PLOT SPLIT HALF RELIABILITY, R2, AND BETA AMPLITUDES BY ROI
 %plot all the reliabilities with the average
 figure, 
 if ~plotBig, subplot(3,1,1), hold on, else, figure, hold on, end
@@ -204,7 +204,7 @@ hline(0,':k')
 title('Beta weights')
 
 
-%% process data - filter by reliability, combined hemis
+%% PROCESS DATA - FILTER BY RELIABILITY, COMBINE HEMIS
 %first, get all of the betas for individual stim types for rois
 for taskNum = 1:2
     for roi = 1:length(roiNames);
@@ -215,7 +215,7 @@ for taskNum = 1:2
     end
 end
 
-%combined all of the betas from each hemisphere
+%combine all of the betas from each hemisphere
 for roi = 1:length(roiNames)
     for stimName = 1:length(task{1}.stimNames)
         allBetasCombined{roi}{stimName} = [allBetas{1}{roi}{stimName}; allBetas{2}{roi}{stimName}];
@@ -241,7 +241,7 @@ end
 
 
 
-%% count number of voxelsfor sub = 1:2:length(roiNames);
+%% COUNT NUMBER OF VOXELS FOR SUB = 1:2:LENGTH(ROINAMES);
 for sub = 1:2:length(roiNames);
     singleTrials = cat(2, allBetasCombinedFiltered{sub}{1:length(task{1}.stimNames)});
     if size(singleTrials,1) > 2
@@ -250,17 +250,14 @@ for sub = 1:2:length(roiNames);
     end
 end
 
-
-
-%% look at the reliability of the patterns for single trials in different areas
-figure,
-
 %make roisToCombine
 roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > nVoxelsNeeded); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
 singleTrialCorrs = {};
 
 %go through each ROI, plot the average RSM for INDIVIDUAL presentations of the same stimuli
 %this should be read as how consistent the ROI is
+figure
+
 for roi = roisToCombine;
     singleTrialCorrelations = zeros(numStimRepeats);
     for stim = 1:length(task{1}.stimNames);
@@ -273,83 +270,13 @@ for roi = roisToCombine;
     colorbar, caxis([-.2 .2])
     title(roiNames(roi))
 end
-
+ 
 sgtitle('Reliability by area (individual trial correlations, averaged over all stimuli)')
+close
 
 
 
-%% look at reliability of patterns for different stimuli
-%stimNames = task{1}.stimfile.stimulus.objNames;
-stimNames = [1:24];
-
-figure, hold on
-colors = cool(numBetasEachScan/2);
-for stim = 1:length(task{1}.stimNames)
-    y = [];
-    %subplot(4,ceil(length(stimNames)/4),stim), hold on
-
-    for roi = 1:length(roisToCombine);
-        stimSingleTrialCorrs = singleTrialCorrs{roisToCombine(roi)}{stim};
-        %scatter(roi, median(stimSingleTrialCorrs(stimSingleTrialCorrs<1)));
-        y = [y median(stimSingleTrialCorrs(stimSingleTrialCorrs<1))];
-    end
-
-    scatter(1:length(roisToCombine), y, 100, 'MarkerFaceColor', colors(stim,:), 'MarkerEdgeColor', 'w');
-
-
-end
-
-hline(0)
-xticks(1:length(roisToCombine)); xticklabels(roiNames(roisToCombine));
-title('Median single-trial correlation by area (by stimulus)');
-%legend(stimNames);
-
-
-
-%% look at the RSMs in individual ROIs
-figure
-for roi = roisToCombine;
-    averagedReps = zeros(length(stimNames), numUsableVoxelsByROI(roi));
-    for stim = 1:length(task{1}.stimNames);
-        averageStim =  mean(allBetasCombinedFiltered{roi}{stim},2);
-        averagedReps(stim,:) = averageStim;
-    end
-
-    subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)), hold on
-    RSM = corr(averagedReps');
-    imagesc(RSM),
-    colorbar, caxis([-1 1])
-    title(roiNames(roi))
-end
-
-sgtitle('RSMs for all simuli in different areas')
-
-
-%% classification in individual ROIs - train an SVM on the n-way classification task (number of stimuli types)
-figure
-for roi = roisToCombine
-    %create data and labels
-    data = cell2mat(allBetasCombinedFiltered{roi})';
-    labels = repelem(1:length(stimNames), numStimRepeats);
-    [data, labels] = shuffleDataLabelOrder(data, labels);
-    %fit sv 
-    numFolds = 5;
-    svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-    % eval
-    cvLoss = kfoldLoss(svm); % Cross-validated classification error
-    disp(['Cross-validated loss: ', num2str(cvLoss)]);
-    predictions = kfoldPredict(svm);
-    %plot confusion
-    subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)),
-    confusionchart(labels, predictions, 'Normalization', 'column-normalized')
-    title(roiNames(roi))
-end
-
-
-
-
-
-%% Make different averaged ROIs. 
+%% MAKE DIFFERENT LARGE ROIS (EARLY, MIDDLE, VENTRAL) AND ALSO MAKE AVERAGED VERSIONS
 % early visual cortex ROI (v1 and v2)
 earlyROIs = [1 3];
 for stim = 1:length(task{1}.stimNames);
@@ -407,75 +334,31 @@ end
 
 
 
-%% n-way (all stimuli) classification on the different ROIs (all, early, middle, late)
+%% PLOT RELIABILITY OF PATTERNS OF DIFFERENT STIMULI
+%stimNames = task{1}.stimfile.stimulus.objNames;
+stimNames = [1:24];
 
-% classification on big roi
-    figure, subplot(2,2,1)
-    %create data and labels
-    data = cell2mat(allBetasBigROI)';
-    labels = repelem(1:length(stimNames), numStimRepeats);
-    [data, labels] = shuffleDataLabelOrder(data, labels);
-    %fit svm
-    numFolds = 5;
-    svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-    % eval
-    cvLoss = kfoldLoss(svm); % Cross-validated classification error
-    disp(['Cross-validated loss: ', num2str(cvLoss)]);
-    predictions = kfoldPredict(svm);
-    allROIsConfusionChart = confusionchart(labels, predictions, 'Normalization', 'column-normalized');
-    title(sprintf('All ROIs confusion chart: %0.2f accuracy', 1-cvLoss))
-    
-    RSMconfusionCorr = corr(RSM(RSM<1),allROIsConfusionChart.NormalizedValues(RSM<1));
-    sprintf('Correlation between confusion chart and RSM: %0.3f', RSMconfusionCorr)
+figure, hold on
+colors = cool(numBetasEachScan/2);
+for stim = 1:length(task{1}.stimNames)
+    y = [];
+    %subplot(4,ceil(length(stimNames)/4),stim), hold on
+
+    for roi = 1:length(roisToCombine);
+        stimSingleTrialCorrs = singleTrialCorrs{roisToCombine(roi)}{stim};
+        %scatter(roi, median(stimSingleTrialCorrs(stimSingleTrialCorrs<1)));
+        y = [y median(stimSingleTrialCorrs(stimSingleTrialCorrs<1))];
+    end
+
+    scatter(1:length(roisToCombine), y, 100, 'MarkerFaceColor', colors(stim,:), 'MarkerEdgeColor', 'w');
 
 
-% classification on EVC roi
-    subplot(2,2,2)
-    %create data and labels
-    data = cell2mat(allBetasEVCROI)';
-    labels = repelem(1:length(stimNames), numStimRepeats);
-    [data, labels] = shuffleDataLabelOrder(data, labels);
-    %fit svm
-    svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-    % eval
-    cvLoss = kfoldLoss(svm); % Cross-validated classification error
-    disp(['Cross-validated loss: ', num2str(cvLoss)]);
-    predictions = kfoldPredict(svm);
-    confusionchart(labels, predictions, 'Normalization', 'column-normalized')
-    title(sprintf('Early visual confusion chart: %0.2f accuracy', 1-cvLoss))
+end
 
-
-% classification on MVC roi
-    subplot(2,2,3)
-    %create data and labels
-    data = cell2mat(allBetasMVCROI)';
-    labels = repelem(1:length(stimNames), numStimRepeats);
-    [data, labels] = shuffleDataLabelOrder(data, labels);
-    %fit svm
-    svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-    % eval
-    cvLoss = kfoldLoss(svm); % Cross-validated classification error
-    disp(['Cross-validated loss: ', num2str(cvLoss)]);
-    predictions = kfoldPredict(svm);
-    confusionchart(labels, predictions, 'Normalization', 'column-normalized')
-    title(sprintf('Mid-level visual confusion chart: %0.2f accuracy', 1-cvLoss))
-
-
-% classification on VVS roi
-    subplot(2,2,4)
-    %create data and labels
-    data = cell2mat(allBetasVVSROI)';
-    labels = repelem(1:length(stimNames), numStimRepeats);
-    [data, labels] = shuffleDataLabelOrder(data, labels);
-    %fit svm
-    svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-    % eval
-    cvLoss = kfoldLoss(svm); % Cross-validated classification error
-    disp(['Cross-validated loss: ', num2str(cvLoss)]);
-    predictions = kfoldPredict(svm);
-    confusionchart(labels, predictions, 'Normalization', 'column-normalized')
-    title(sprintf('VVS confusion chart: %0.2f accuracy', 1-cvLoss))
-
+hline(0)
+xticks(1:length(roisToCombine)); xticklabels(roiNames(roisToCombine));
+title('Median single-trial correlation by area (by stimulus)');
+%legend(stimNames);
 
 
 
@@ -513,7 +396,7 @@ plot(y_fit)
 
 
 
-%% Make RSMS for all rois, EVC rois, MVC rois, and VVS rois.
+%% MAKE RSMS FOR ALL ROIS, EVC ROIS, MVC ROIS, AND VVS ROIS.
 % RSM of the big ROI, combining all the small ROIS
     %create empty matrices
     averagedReps = zeros(length(stimNames), size(allBetasBigROI{1},1));
@@ -633,7 +516,7 @@ plot(y_fit)
 
 
 
-%% do mlds in different regions
+%% DO MLDS IN DIFFERENT REGIONS
 
 %do EVC
 figure
@@ -653,7 +536,7 @@ sgtitle('VVS mlds')
 
 
 
-%% 2-way classification between interpolation sets
+%% 2-WAY CLASSIFICATION BETWEEN INTERPOLATION SETS
 %classify EVC
 figure
 doClassification(allBetasEVCROI, colors, task, numStimRepeats, interpSets)
@@ -672,19 +555,17 @@ sgtitle('Classification: VVS')
 
 
 
-%% averge the RSMs of the individual interpolations together and plot for each area
+%% AVERAGE THE RSMS OF THE INDIVIDUAL INTERPOLATIONS TOGETHER AND PLOT FOR EACH AREA
 
-%first, averge the RSMS
+%first, average the RSMS
 BigROIRSMAveraged = averageRSM(BigROIRSM, interpSets);
-
 EVCRSMAveraged = averageRSM(EVCRSM, interpSets);
-
 MVCRSMAveraged = averageRSM(MVCRSM, interpSets);
-
 VVSRSMAveraged = averageRSM(VVSRSM, interpSets);
 
 %plot them
 figure
+
 subplot(2,2,1), imagesc(BigROIRSMAveraged), colormap(hot), colorbar, caxis([0 1])
 title('RSM: All voxels'), xlabel('Interpolation number'), ylabel('Interpolation number')
 
@@ -699,7 +580,9 @@ title('RSM: VVS voxels'), xlabel('Object number'), ylabel('Interpolation number'
 
 sgtitle('RSMs, averaged (post-normalization) over all interpolated stimulus sets')
 
-%do MLDS on averaged RSMs:
+
+
+%% DO MLDS ON THE AVERAGED RSMs AND PLOT IT:
 figure, subplot(1,4,1), hold on
 doMLDS(EVCRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
 title('Early visual cortex')
@@ -722,39 +605,15 @@ sgtitle('MLDS for averaged interpolations in different areas')
 
 
 
-%%
+
+
+
+%% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%%
+
 keyboard
 
 
 
-
-%% Try doing PCA....
-interpSet = interpSets{1};
-
-%make evc
-evcResponses = cell2mat(allBetasEVCROIAveraged);
-evcResponses = evcResponses(:,interpSet)';
-[coeff, scores, latent] = pca(evcResponses);
-EVC = []; EVC.coeff = coeff; EVC.scores = scores; EVC.latent = latent;
-
-%make vmvc
-mvcResponses = cell2mat(allBetasMVCROIAveraged);
-mvcResponses = mvcResponses(:,interpSet)';
-[coeff, scores, latent] = pca(mvcResponses);
-MVC = []; MVC.coeff = coeff; MVC.scores = scores; MVC.latent = latent;
-
-%make vvs
-vvsResponses = cell2mat(allBetasVVSROIAveraged);
-vvsResponses = vvsResponses(:,interpSet)';
-[coeff, scores, latent] = pca(vvsResponses);
-VVS = []; VVS.coeff = coeff; VVS.scores = scores; VVS.latent = latent;
-
-
-
-
-
-
-%%
 
 
 
@@ -838,7 +697,7 @@ function doClassification(classificationVoxels, colors, task, numStimRepeats, in
 
 %% do maximum likelihood distance scaling on the averaged representation with voxels from all ROIs
 function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSets, preComputeCorr)    
-    disp('Doing mlds - takes a minute or so.')
+    disp('Doing mlds...')
     %iterate through different interps
     for repititions = 1:mldsReps
     
@@ -987,3 +846,147 @@ function totalProb = computeLoss(params, ims, responses)
 
 
 
+
+
+
+% %% look at the RSMs in individual ROIs
+% figure
+% for roi = roisToCombine;
+%     averagedReps = zeros(length(stimNames), numUsableVoxelsByROI(roi));
+%     for stim = 1:length(task{1}.stimNames);
+%         averageStim =  mean(allBetasCombinedFiltered{roi}{stim},2);
+%         averagedReps(stim,:) = averageStim;
+%     end
+% 
+%     subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)), hold on
+%     RSM = corr(averagedReps');
+%     imagesc(RSM),
+%     colorbar, caxis([-1 1])
+%     title(roiNames(roi))
+% end
+% 
+% sgtitle('RSMs for all simuli in different areas')
+% 
+% 
+
+
+
+% %% classification in individual ROIs - train an SVM on the n-way classification task (number of stimuli types)
+% figure
+% for roi = roisToCombine
+%     %create data and labels
+%     data = cell2mat(allBetasCombinedFiltered{roi})';
+%     labels = repelem(1:length(stimNames), numStimRepeats);
+%     [data, labels] = shuffleDataLabelOrder(data, labels);
+%     %fit sv 
+%     numFolds = 5;
+%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+%     % eval
+%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
+%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
+%     predictions = kfoldPredict(svm);
+%     %plot confusion
+%     subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)),
+%     confusionchart(labels, predictions, 'Normalization', 'column-normalized')
+%     title(roiNames(roi))
+% end
+% 
+% 
+% 
+% 
+
+
+% %% n-way (all stimuli) classification on the different ROIs (all, early, middle, late)
+% 
+% % classification on big roi
+%     figure, subplot(2,2,1)
+%     %create data and labels
+%     data = cell2mat(allBetasBigROI)';
+%     labels = repelem(1:length(stimNames), numStimRepeats);
+%     [data, labels] = shuffleDataLabelOrder(data, labels);
+%     %fit svm
+%     numFolds = 5;
+%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+%     % eval
+%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
+%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
+%     predictions = kfoldPredict(svm);
+%     allROIsConfusionChart = confusionchart(labels, predictions, 'Normalization', 'column-normalized');
+%     title(sprintf('All ROIs confusion chart: %0.2f accuracy', 1-cvLoss))
+%     
+%     RSMconfusionCorr = corr(RSM(RSM<1),allROIsConfusionChart.NormalizedValues(RSM<1));
+%     sprintf('Correlation between confusion chart and RSM: %0.3f', RSMconfusionCorr)
+% 
+% 
+% % classification on EVC roi
+%     subplot(2,2,2)
+%     %create data and labels
+%     data = cell2mat(allBetasEVCROI)';
+%     labels = repelem(1:length(stimNames), numStimRepeats);
+%     [data, labels] = shuffleDataLabelOrder(data, labels);
+%     %fit svm
+%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+%     % eval
+%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
+%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
+%     predictions = kfoldPredict(svm);
+%     confusionchart(labels, predictions, 'Normalization', 'column-normalized')
+%     title(sprintf('Early visual confusion chart: %0.2f accuracy', 1-cvLoss))
+% 
+% 
+% % classification on MVC roi
+%     subplot(2,2,3)
+%     %create data and labels
+%     data = cell2mat(allBetasMVCROI)';
+%     labels = repelem(1:length(stimNames), numStimRepeats);
+%     [data, labels] = shuffleDataLabelOrder(data, labels);
+%     %fit svm
+%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+%     % eval
+%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
+%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
+%     predictions = kfoldPredict(svm);
+%     confusionchart(labels, predictions, 'Normalization', 'column-normalized')
+%     title(sprintf('Mid-level visual confusion chart: %0.2f accuracy', 1-cvLoss))
+% 
+% 
+% % classification on VVS roi
+%     subplot(2,2,4)
+%     %create data and labels
+%     data = cell2mat(allBetasVVSROI)';
+%     labels = repelem(1:length(stimNames), numStimRepeats);
+%     [data, labels] = shuffleDataLabelOrder(data, labels);
+%     %fit svm
+%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
+%     % eval
+%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
+%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
+%     predictions = kfoldPredict(svm);
+%     confusionchart(labels, predictions, 'Normalization', 'column-normalized')
+%     title(sprintf('VVS confusion chart: %0.2f accuracy', 1-cvLoss))
+
+
+
+% %% look at the reliability of the patterns for single trials in different areas
+% figure,
+% 
+% %make roisToCombine
+% roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > nVoxelsNeeded); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
+% singleTrialCorrs = {};
+% 
+% %go through each ROI, plot the average RSM for INDIVIDUAL presentations of the same stimuli
+% %this should be read as how consistent the ROI is
+% for roi = roisToCombine;
+%     singleTrialCorrelations = zeros(numStimRepeats);
+%     for stim = 1:length(task{1}.stimNames);
+%         singleTrialCorrelations = singleTrialCorrelations + corr(allBetasCombinedFiltered{roi}{stim})/length(task{1}.stimNames);
+%         singleTrialCorrs{roi}{stim} = corr(allBetasCombinedFiltered{roi}{stim});
+%     end
+% 
+%     subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)), hold on
+%     imagesc(singleTrialCorrelations),
+%     colorbar, caxis([-.2 .2])
+%     title(roiNames(roi))
+% end
+% 
+% sgtitle('Reliability by area (individual trial correlations, averaged over all stimuli)')
