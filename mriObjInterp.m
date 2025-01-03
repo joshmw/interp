@@ -28,14 +28,14 @@ function mriObjInterp(varargin)
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliabilityCutoff=.35', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=.35', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=5000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE rois shold be responsive
 %load the data
 
-cd('~/data/interp/s0603/')
+cd('~/data/interp/s0603/betaFiles')
 task{1} = load('s0603Task1.mat');
 task{2} = load('s0603Task2.mat');
 interpSets = {[1:6], [7:12], [13:18], [19:24]};
@@ -631,46 +631,37 @@ plot(y_fit)
     xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
     drawLines
 
-
+keyboard
 
 %% averge the RSMs of the individual interpolations together
 
 %first, averge the RSMS
-BigROIRSMAveraged = zeros(length(interpSets{1}), length(interpSets{1}));
-for set = 1:length(interpSets)
-    BigROIRSMAveraged = BigROIRSMAveraged + BigROIRSM(interpSets{set},interpSets{set});
-end
+BigROIRSMAveraged = averageRSM(BigROIRSM, interpSets);
 
-EVCRSMAveraged = zeros(length(interpSets{1}), length(interpSets{1}));
-for set = 1:length(interpSets)
-    EVCRSMAveraged = EVCRSMAveraged + EVCRSM(interpSets{set},interpSets{set});
-end
+EVCRSMAveraged = averageRSM(EVCRSM, interpSets);
 
-MVCRSMAveraged = zeros(length(interpSets{1}), length(interpSets{1}));
-for set = 1:length(interpSets)
-    MVCRSMAveraged = MVCRSMAveraged + MVCRSM(interpSets{set},interpSets{set});
-end
+MVCRSMAveraged = averageRSM(MVCRSM, interpSets);
 
-VVSRSMAveraged = zeros(length(interpSets{1}), length(interpSets{1}));
-for set = 1:length(interpSets)
-    VVSRSMAveraged = VVSRSMAveraged + VVSRSM(interpSets{set},interpSets{set});
-end
+VVSRSMAveraged = averageRSM(VVSRSM, interpSets);
 
 %plot them
 figure
-subplot(2,2,1), imagesc(BigROIRSMAveraged), colormap(hot), colorbar, caxis([-1 1])
+subplot(2,2,1), imagesc(BigROIRSMAveraged), colormap(hot), colorbar, caxis([0 1])
 title('RSM: All voxels'), xlabel('Interpolation number'), ylabel('Interpolation number')
 
-subplot(2,2,2), imagesc(EVCROIRSMAveraged), colormap(hot), colorbar, caxis([-1 1])
+subplot(2,2,2), imagesc(EVCRSMAveraged), colormap(hot), colorbar, caxis([0 1])
 title('RSM: EVC Voxels'), xlabel('Interpolation number'), ylabel('Interpolation number')
 
-subplot(2,2,3), imagesc(MVCROIRSMAveraged), colormap(hot), colorbar, caxis([-1 1])
+subplot(2,2,3), imagesc(MVCRSMAveraged), colormap(hot), colorbar, caxis([0 1])
 title('RSM: Mid-level voxels'), xlabel('Object number'), ylabel('Interpolation number')
 
-subplot(2,2,4), imagesc(VVSROIRSMAveraged), colormap(hot), colorbar, caxis([-1 1])
+subplot(2,2,4), imagesc(VVSRSMAveraged), colormap(hot), colorbar, caxis([0 1])
 title('RSM: VVS voxels'), xlabel('Object number'), ylabel('Interpolation number')
 
-sgtitle('RSMs, averaged over all interpolated stimulus sets')
+sgtitle('RSMs, averaged (post-normalization) over all interpolated stimulus sets')
+
+%do MLDS on averaged RSM
+figure, doMLDS(MVCRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
 
 
 
@@ -678,17 +669,17 @@ sgtitle('RSMs, averaged over all interpolated stimulus sets')
 
 %do EVC
 figure
-doMLDS(allBetasEVCROIAveraged, mldsReps, colors, task, interpSets)
+doMLDS(allBetasEVCROIAveraged, mldsReps, colors, task, interpSets, 0)
 sgtitle('EVC mlds')
 
 %do MVC
 figure
-doMLDS(allBetasMVCROIAveraged, mldsReps, colors, task)
+doMLDS(allBetasMVCROIAveraged, mldsReps, colors, task, interpSets, 0)
 sgtitle('Mid-level cortex Mlds')
 
 %do ventral ROIs
 figure
-doMLDS(allBetasVVSROIAveraged, mldsReps, colors, task)
+doMLDS(allBetasVVSROIAveraged, mldsReps, colors, task, interpSets, 0)
 sgtitle('VVS mlds')
 
 
@@ -714,7 +705,7 @@ sgtitle('Classification: VVS')
 
 
 
-%%
+%% Try doing PCA....
 interpSet = interpSets{1};
 
 %make evc
@@ -745,6 +736,32 @@ VVS = []; VVS.coeff = coeff; VVS.scores = scores; VVS.latent = latent;
 keyboard
 
 
+
+
+
+
+
+%%%%%%%%%%%%%%
+%% averageRSMs
+%%%%%%%%%%%%%%%
+%average the RSMs of the different interpolations
+function averagedRSM = averageRSM(rsm, interpSets)
+averagedRSM = zeros(length(interpSets{1}), length(interpSets{1}));
+
+%concat different interpolations
+catRSM = cat(3, rsm(interpSets{1},interpSets{1}), rsm(interpSets{2},interpSets{2}), rsm(interpSets{3},interpSets{3}), rsm(interpSets{4},interpSets{4}));
+
+%z score
+%normalizedRSM = (catRSM - mean(catRSM, [1 2])) ./ std(catRSM, 0, [1 2]);
+
+%min/max normalization
+minVal = min(catRSM, [], [1 2]); % Minimum value across each matrix
+maxVal = max(catRSM, [], [1 2]); % Maximum value across each matrix
+normalizedRSM = (catRSM - minVal) ./ (maxVal - minVal + eps); % Add eps to avoid division by zero
+
+
+%average
+averagedRSM = mean(normalizedRSM, 3);
 
 
 
@@ -799,7 +816,7 @@ function doClassification(classificationVoxels, colors, task, numStimRepeats, in
 
 
 %% do maximum likelihood distance scaling on the averaged representation with voxels from all ROIs
-function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSets)    
+function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSets, preComputeCorr)    
     disp('Doing mlds - takes a minute or so.')
     %iterate through different interps
     for repititions = 1:mldsReps
@@ -815,13 +832,17 @@ function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSe
         %do the mlds
         for set = 1:length(interpSets)
         
+            %get the correlation matrix
+            if ~preComputeCorr
+                averagedInterps = cat(2, allBetasBigROIAveragedMlds{interpSets{set}});
+                corMatrix = corr(averagedInterps); %cosine distance
+            else
+                corMatrix = mldsVoxels;
+            end
+
+
             %simulate n draws of 4 images
             numSamples = 1000;
-            averagedInterps = cat(2, allBetasBigROIAveragedMlds{interpSets{set}});
-            %can use either correlations or euclidean distance
-            corMatrix = corr(averagedInterps); %cosine distance
-            %corMatrix = -pdist2(averagedInterps',averagedInterps'); %euclidean distance implementation
-            %calculate which pair has a higher correlation
             ims = randi(6,4,numSamples);
             responses = [];
             for trial = 1:numSamples
