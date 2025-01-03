@@ -28,7 +28,7 @@ function mriObjInterp(varargin)
 
 %% Load the data
 %get args
-getArgs(varargin, {'reliabilityCutoff=.35', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=5000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=.4', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
@@ -407,7 +407,7 @@ end
 
 
 
-%% classification on the different ROIs (all, early, middle, late)
+%% n-way (all stimuli) classification on the different ROIs (all, early, middle, late)
 
 % classification on big roi
     figure, subplot(2,2,1)
@@ -631,9 +631,48 @@ plot(y_fit)
     xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
     drawLines
 
-keyboard
 
-%% averge the RSMs of the individual interpolations together
+
+%% do mlds in different regions
+
+%do EVC
+figure
+doMLDS(allBetasEVCROIAveraged, mldsReps, colors, task, interpSets, 0)
+sgtitle('EVC mlds')
+
+%do MVC
+figure
+doMLDS(allBetasMVCROIAveraged, mldsReps, colors, task, interpSets, 0)
+sgtitle('Mid-level cortex Mlds')
+
+%do ventral ROIs
+figure
+doMLDS(allBetasVVSROIAveraged, mldsReps, colors, task, interpSets, 0)
+sgtitle('VVS mlds')
+
+
+
+
+%% 2-way classification between interpolation sets
+%classify EVC
+figure
+doClassification(allBetasEVCROI, colors, task, numStimRepeats, interpSets)
+sgtitle('Classification: EVC')
+
+%classify MVC
+figure
+doClassification(allBetasMVCROI, colors, task, numStimRepeats, interpSets)
+sgtitle('Classification: MVC')
+
+
+%classify EVVS
+figure
+doClassification(allBetasVVSROI, colors, task, numStimRepeats, interpSets)
+sgtitle('Classification: VVS')
+
+
+
+%% averge the RSMs of the individual interpolations together and plot for each area
 
 %first, averge the RSMS
 BigROIRSMAveraged = averageRSM(BigROIRSM, interpSets);
@@ -660,47 +699,31 @@ title('RSM: VVS voxels'), xlabel('Object number'), ylabel('Interpolation number'
 
 sgtitle('RSMs, averaged (post-normalization) over all interpolated stimulus sets')
 
-%do MLDS on averaged RSM
-figure, doMLDS(MVCRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
+%do MLDS on averaged RSMs:
+figure, subplot(1,4,1), hold on
+doMLDS(EVCRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
+title('Early visual cortex')
+
+subplot(1,4,2), hold on
+doMLDS(MVCRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
+title('Mid-level visual cortex')
+
+subplot(1,4,3), hold on
+doMLDS(VVSRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
+title('Ventral visual cortex')
+
+subplot(1,4,4), hold on
+doMLDS(BigROIRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
+title('Entire cortex')
+
+sgtitle('MLDS for averaged interpolations in different areas')
 
 
 
-%% do mlds in different regions
-
-%do EVC
-figure
-doMLDS(allBetasEVCROIAveraged, mldsReps, colors, task, interpSets, 0)
-sgtitle('EVC mlds')
-
-%do MVC
-figure
-doMLDS(allBetasMVCROIAveraged, mldsReps, colors, task, interpSets, 0)
-sgtitle('Mid-level cortex Mlds')
-
-%do ventral ROIs
-figure
-doMLDS(allBetasVVSROIAveraged, mldsReps, colors, task, interpSets, 0)
-sgtitle('VVS mlds')
 
 
-%% classification
-%classify EVC
-figure
-doClassification(allBetasEVCROI, colors, task, numStimRepeats, interpSets)
-sgtitle('Classification: EVC')
-
-%classify MVC
-figure
-doClassification(allBetasMVCROI, colors, task, numStimRepeats, interpSets)
-sgtitle('Classification: MVC')
-
-
-%classify EVVS
-figure
-doClassification(allBetasVVSROI, colors, task, numStimRepeats, interpSets)
-sgtitle('Classification: VVS')
-
-
+%%
+keyboard
 
 
 
@@ -732,8 +755,6 @@ VVS = []; VVS.coeff = coeff; VVS.scores = scores; VVS.latent = latent;
 
 
 %%
-
-keyboard
 
 
 
@@ -870,7 +891,7 @@ function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSe
             psi = psi/max(psi);
             
             %plot
-            subplot(1,4,set), hold on
+            if length(interpSets) > 1, subplot(1,4,set), hold on, end
             scatter(1:6,psi, 'filled', 'MarkerFaceColor', colors(max(interpSets{set}),:))
             gaussFit = fitCumulativeGaussian(1:6, psi);
             PSE = gaussFit.mean;
