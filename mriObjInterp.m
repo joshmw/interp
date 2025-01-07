@@ -28,7 +28,7 @@ function mriObjInterp(varargin)
 
 %% LOAD THE DATA
 %get args
-getArgs(varargin, {'reliabilityCutoff=.35', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=.3', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
@@ -36,8 +36,8 @@ getArgs(varargin, {'reliabilityCutoff=.35', 'r2cutoff=0', 'stdCutoff=100', 'shuf
 %load the data
 
 cd('~/data/interp/s0603/betaFiles')
-task{1} = load('s0603Task1.mat');
-task{2} = load('s0603Task2.mat');
+task{1} = load('s0603Task1Parietal.mat');
+task{2} = load('s0603Task2Parietal.mat');
 interpSets = {[1:6], [7:12], [13:18], [19:24]};
 
 
@@ -279,6 +279,7 @@ close
 %% MAKE DIFFERENT LARGE ROIS (EARLY, MIDDLE, VENTRAL) AND ALSO MAKE AVERAGED VERSIONS
 % early visual cortex ROI (v1 and v2)
 earlyROIs = [1 3];
+%earlyROIs = [1];
 for stim = 1:length(task{1}.stimNames);
     allBetasEVCROI{stim} = [];
     for roi = earlyROIs
@@ -293,6 +294,7 @@ end
 
 % mid-visual cortex ROIS (v3, v4, etc)
 midROIs = [5 7 9 11 17 19];
+%midROIs = [3 5 7 9 11];
 for stim = 1:length(task{1}.stimNames);
     allBetasMVCROI{stim} = [];
     for roi = midROIs
@@ -305,8 +307,9 @@ for interp = 1:length(task{1}.stimNames)
     allBetasMVCROIAveraged{interp} = mean(allBetasMVCROI{interp}, 2);
 end
 
-% "late" visual ROIs (IT, FFA, LO, etc).
+% "ventral" visual ROIs (IT, FFA, LO, etc).
 lateROIs = [13 15 21 23 25 27 29 31 33 39 41 45 47 49 51];
+%lateROIs = [13 15 17 19 21 23 25 27 29 31 33 39 41 45 47 49 51];
 for stim = 1:length(task{1}.stimNames);
     allBetasVVSROI{stim} = [];
     for roi = lateROIs
@@ -318,6 +321,24 @@ end
 for interp = 1:length(task{1}.stimNames)
     allBetasVVSROIAveraged{interp} = mean(allBetasVVSROI{interp}, 2);
 end
+
+
+% "parietal" visual ROIs
+parietalROIs = [63 65 69 71 73 81 83 85 87];
+%lateROIs = [13 15 17 19 21 23 25 27 29 31 33 39 41 45 47 49 51];
+for stim = 1:length(task{1}.stimNames);
+    allBetasParietalROI{stim} = [];
+    for roi = parietalROIs
+        allBetasParietalROI{stim} = [allBetasParietalROI{stim}; allBetasCombinedFiltered{roi}{stim}];
+    end
+end
+
+%average VVS roi
+for interp = 1:length(task{1}.stimNames)
+    allBetasParietalROIAveraged{interp} = mean(allBetasParietalROI{interp}, 2);
+end
+
+
 
 %big roi - all ROIs to combine.
 for stim = 1:length(task{1}.stimNames);
@@ -514,6 +535,34 @@ plot(y_fit)
     xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
     drawLines
 
+% % RSM of the Parietal ROI
+%     %create empty matrices
+%     averagedReps = zeros(length(stimNames), size(allBetasParietalROI{1},1));
+%     averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
+%     
+%     %go through and add each averaged stimulus response to the empty average matrix
+%     for stim = 1:length(task{1}.stimNames);
+%         %get the average of each of the halves of the stimuli (even or odds)
+%         averagedRepsHalf1(stim,:) = mean(allBetasParietalROI{stim}(:,1:2:end),2);
+%         averagedRepsHalf2(stim,:) = mean(allBetasParietalROI{stim}(:,2:2:end),2);
+%     end
+%     
+%     %rename everything according to earlier convention
+%     allBetasParietalROIAveragedHalf1 = averagedRepsHalf1; allBetasParietalROIAveragedHalf2 = averagedRepsHalf2;
+%     
+%     %make the RSM using halves.
+%     half1 = corr(allBetasParietalROIAveragedHalf1', allBetasParietalROIAveragedHalf2');
+%     half2 = corr(allBetasParietalROIAveragedHalf2', allBetasParietalROIAveragedHalf1');
+%     ParietalRSM = (half1+half2)/2;
+%     
+%     %plot it
+%     subplot(2,2,4), imagesc(ParietalRSM),
+%     colormap(hot), colorbar, caxis([-1 1])
+%     title('RSM: Parietal. Correlation between averaged patterns of activity')
+%     xlabel('Object number'), ylabel('Object number')
+%     xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
+%     drawLines
+
 
 
 %% DO MLDS IN DIFFERENT REGIONS
@@ -611,6 +660,12 @@ sgtitle('MLDS for averaged interpolations in different areas')
 %% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%%
 
 keyboard
+
+
+
+
+
+
 
 
 
