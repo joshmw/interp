@@ -28,16 +28,30 @@ function mriObjInterp(varargin)
 
 %% LOAD THE DATA
 %get args
-getArgs(varargin, {'reliabilityCutoff=.3', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
-    'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)'});
+getArgs(varargin, {'reliabilityCutoff=.30', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+    'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)', 'clean=1'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE rois shold be responsive
 %load the data
 
 cd('~/data/interp/s0603/betaFiles')
-task{1} = load('s0603Task1Parietal.mat');
-task{2} = load('s0603Task2Parietal.mat');
+%task{1} = load('s0603Task1Parietal.mat');
+%task{2} = load('s0603Task2Parietal.mat');
+%bigRois = 0;
+task{1} = load('s0603Task1BigROIs.mat');
+task{2} = load('s0603Task2BigROIs.mat');
+bigRois = 1;
+
+
+%cd('~/data/interp/s0604/betaFiles')
+%task{1} = load('s0604Task1.mat');
+%task{2} = load('s0604Task2.mat');
+%bigRois = 0;
+%task{1} = load('s0604Task1BigROIs.mat');
+%task{2} = load('s0604Task2BigROIs.mat');
+%bigRois = 1;
+
 interpSets = {[1:6], [7:12], [13:18], [19:24]};
 
 
@@ -51,12 +65,6 @@ odds = mod(task{2}.whichROI,2) == 1;
 evens = ~odds;
 task{2}.whichROI(evens) = task{2}.whichROI(evens) - 1;
 task{2}.whichROI(odds) = task{2}.whichROI(odds) + 1;
-
-%shuffle the data if you want to - this is a flag you can set for control analyses. randomizes the category labels of all the stimuli
-if shuffleData
-    task{1}.trial_conditions = task{1}.trial_conditions(randperm(length(task{1}.trial_conditions)));
-    task{2}.trial_conditions = task{2}.trial_conditions(randperm(length(task{2}.trial_conditions)));
-end
 
 %rename rois to contra and ipso so we can combine
 roiNames = task{1}.roiNames;
@@ -136,8 +144,6 @@ for taskNum = 1:2;
 end
 
 
-
-
 %% PARTITION BY ROI AND FILTER BY VOXEL RELIABILITY
 for taskNum = 1:2
     for roi = 1:length(task{taskNum}.roiNames);
@@ -203,6 +209,12 @@ ylim([-2 2])
 hline(0,':k')
 title('Beta weights')
 
+
+%% shuffle the data if you want to - this is a flag you can set for control analyses. randomizes the category labels of all the stimuli
+if shuffleData
+    task{1}.trial_conditions = task{1}.trial_conditions(randperm(length(task{1}.trial_conditions)));
+    task{2}.trial_conditions = task{2}.trial_conditions(randperm(length(task{2}.trial_conditions)));
+end
 
 %% PROCESS DATA - FILTER BY RELIABILITY, COMBINE HEMIS
 %first, get all of the betas for individual stim types for rois
@@ -279,7 +291,8 @@ close
 %% MAKE DIFFERENT LARGE ROIS (EARLY, MIDDLE, VENTRAL) AND ALSO MAKE AVERAGED VERSIONS
 % early visual cortex ROI (v1 and v2)
 earlyROIs = [1 3];
-%earlyROIs = [1];
+if bigRois, earlyROIs = 1; end
+
 for stim = 1:length(task{1}.stimNames);
     allBetasEVCROI{stim} = [];
     for roi = earlyROIs
@@ -294,7 +307,8 @@ end
 
 % mid-visual cortex ROIS (v3, v4, etc)
 midROIs = [5 7 9 11 17 19];
-%midROIs = [3 5 7 9 11];
+if bigRois, midROIs = 3; end
+
 for stim = 1:length(task{1}.stimNames);
     allBetasMVCROI{stim} = [];
     for roi = midROIs
@@ -309,7 +323,8 @@ end
 
 % "ventral" visual ROIs (IT, FFA, LO, etc).
 lateROIs = [13 15 21 23 25 27 29 31 33 39 41 45 47 49 51];
-%lateROIs = [13 15 17 19 21 23 25 27 29 31 33 39 41 45 47 49 51];
+if bigRois, lateROIs = 5; end
+
 for stim = 1:length(task{1}.stimNames);
     allBetasVVSROI{stim} = [];
     for roi = lateROIs
@@ -325,6 +340,8 @@ end
 
 % "parietal" visual ROIs
 parietalROIs = [63 65 69 71 73 81 83 85 87];
+if bigRois, parietalROIs = 7; end
+
 %lateROIs = [13 15 17 19 21 23 25 27 29 31 33 39 41 45 47 49 51];
 for stim = 1:length(task{1}.stimNames);
     allBetasParietalROI{stim} = [];
@@ -333,7 +350,7 @@ for stim = 1:length(task{1}.stimNames);
     end
 end
 
-%average VVS roi
+%average parietal roi
 for interp = 1:length(task{1}.stimNames)
     allBetasParietalROIAveraged{interp} = mean(allBetasParietalROI{interp}, 2);
 end
@@ -383,37 +400,24 @@ title('Median single-trial correlation by area (by stimulus)');
 
 
 
-%% reliability as a function of the number of repeats
-figure, hold on
+%% RELIABILITY OF EACH ROI PATTERN AS A NUMBER OF REPEATS
+figure
 
-r = [];
-for numVoxels = 1:(numStimRepeats/2)
-    corrVals = [];
-    for stimulus = 1:length(stimNames)
-        corrVals1stim = [];
-        for repeat = 1:1000
-            subsetVoxels = randsample(1:numStimRepeats, numVoxels*2);
-            subset = allBetasBigROI{stimulus}(:,subsetVoxels);
-            averageHalf1 = mean(subset(:,1:numVoxels),2);
-            averageHalf2 = mean(subset(:,(1+numVoxels):end),2);
-            corrVal = corr(averageHalf1,averageHalf2);
-            corrVals = [corrVals corrVal];
-            corrVals1stim = [corrVals1stim corrVal];
-        end
-        scatter(numVoxels, mean(corrVals1stim), 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.1, 'MarkerEdgeAlpha', 0.1);
-    end
-    scatter(numVoxels, mean(corrVals), 60, 'MarkerFaceColor', 'r', 'MarkerEdgeColor', 'w')
-    r = [r mean(corrVals)]; y = r; x = 1:(numStimRepeats/2);
-end
+%plot all voxels
+subplot(2,2,1), hold on, title("All voxel reliability")
+plotROIReliability(allBetasBigROI, numStimRepeats, stimNames)
 
-xlabel(('Number of scans in averages'))
-ylabel('Correlation between responses to the same stimuli')
+%plot evc voxels
+subplot(2,2,2), hold on, title("EVC voxel reliability")
+plotROIReliability(allBetasEVCROI, numStimRepeats, stimNames)
 
-opt = fminsearch(@(p) sum((y - (p(1)*sqrt(x) + p(2))).^2), [1, 0]);
-a = opt(1); b = opt(2);
-y_fit = a * sqrt(x) + b;
-R2 = 1 - sum((y - y_fit).^2) / sum((y - mean(y)).^2);
-plot(y_fit)
+%plot all voxels
+subplot(2,2,3), hold on, title("MVC voxel reliability") 
+plotROIReliability(allBetasMVCROI, numStimRepeats, stimNames)
+
+%plot all voxels
+subplot(2,2,4), hold on, title("VVS voxel reliability")
+plotROIReliability(allBetasVVSROI, numStimRepeats, stimNames)
 
 
 
@@ -535,33 +539,33 @@ plot(y_fit)
     xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
     drawLines
 
-% % RSM of the Parietal ROI
-%     %create empty matrices
-%     averagedReps = zeros(length(stimNames), size(allBetasParietalROI{1},1));
-%     averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
-%     
-%     %go through and add each averaged stimulus response to the empty average matrix
-%     for stim = 1:length(task{1}.stimNames);
-%         %get the average of each of the halves of the stimuli (even or odds)
-%         averagedRepsHalf1(stim,:) = mean(allBetasParietalROI{stim}(:,1:2:end),2);
-%         averagedRepsHalf2(stim,:) = mean(allBetasParietalROI{stim}(:,2:2:end),2);
-%     end
-%     
-%     %rename everything according to earlier convention
-%     allBetasParietalROIAveragedHalf1 = averagedRepsHalf1; allBetasParietalROIAveragedHalf2 = averagedRepsHalf2;
-%     
-%     %make the RSM using halves.
-%     half1 = corr(allBetasParietalROIAveragedHalf1', allBetasParietalROIAveragedHalf2');
-%     half2 = corr(allBetasParietalROIAveragedHalf2', allBetasParietalROIAveragedHalf1');
-%     ParietalRSM = (half1+half2)/2;
-%     
-%     %plot it
-%     subplot(2,2,4), imagesc(ParietalRSM),
-%     colormap(hot), colorbar, caxis([-1 1])
-%     title('RSM: Parietal. Correlation between averaged patterns of activity')
-%     xlabel('Object number'), ylabel('Object number')
-%     xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
-%     drawLines
+% RSM of the Parietal ROI
+    %create empty matrices
+    averagedReps = zeros(length(stimNames), size(allBetasParietalROI{1},1));
+    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
+    
+    %go through and add each averaged stimulus response to the empty average matrix
+    for stim = 1:length(task{1}.stimNames);
+        %get the average of each of the halves of the stimuli (even or odds)
+        averagedRepsHalf1(stim,:) = mean(allBetasParietalROI{stim}(:,1:2:end),2);
+        averagedRepsHalf2(stim,:) = mean(allBetasParietalROI{stim}(:,2:2:end),2);
+    end
+    
+    %rename everything according to earlier convention
+    allBetasParietalROIAveragedHalf1 = averagedRepsHalf1; allBetasParietalROIAveragedHalf2 = averagedRepsHalf2;
+    
+    %make the RSM using halves.
+    half1 = corr(allBetasParietalROIAveragedHalf1', allBetasParietalROIAveragedHalf2');
+    half2 = corr(allBetasParietalROIAveragedHalf2', allBetasParietalROIAveragedHalf1');
+    ParietalRSM = (half1+half2)/2;
+    
+    %plot it
+    figure, imagesc(ParietalRSM),
+    colormap(hot), colorbar, caxis([-1 1])
+    title('RSM: Parietal. Correlation between averaged patterns of activity')
+    xlabel('Object number'), ylabel('Object number')
+    xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
+    drawLines
 
 
 
@@ -571,17 +575,25 @@ plot(y_fit)
 figure
 doMLDS(allBetasEVCROIAveraged, mldsReps, colors, task, interpSets, 0)
 sgtitle('EVC mlds')
+if clean, close, end
 
 %do MVC
 figure
 doMLDS(allBetasMVCROIAveraged, mldsReps, colors, task, interpSets, 0)
 sgtitle('Mid-level cortex Mlds')
+if clean, close, end
 
 %do ventral ROIs
 figure
 doMLDS(allBetasVVSROIAveraged, mldsReps, colors, task, interpSets, 0)
 sgtitle('VVS mlds')
+if clean, close, end
 
+%do parietal ROI
+figure
+doMLDS(allBetasParietalROIAveraged, mldsReps, colors, task, interpSets, 0)
+sgtitle('Parietal mlds')
+if clean, close, end
 
 
 
@@ -590,17 +602,25 @@ sgtitle('VVS mlds')
 figure
 doClassification(allBetasEVCROI, colors, task, numStimRepeats, interpSets)
 sgtitle('Classification: EVC')
+if clean, close, end
 
 %classify MVC
 figure
 doClassification(allBetasMVCROI, colors, task, numStimRepeats, interpSets)
 sgtitle('Classification: MVC')
+if clean, close, end
 
 
-%classify EVVS
+%classify VVS
+
+
+if clean, close, end
+
+%classify Parietal
 figure
-doClassification(allBetasVVSROI, colors, task, numStimRepeats, interpSets)
-sgtitle('Classification: VVS')
+doClassification(allBetasParietalROI, colors, task, numStimRepeats, interpSets)
+sgtitle('Classification: Parietal')
+if clean, close, end
 
 
 
@@ -611,6 +631,8 @@ BigROIRSMAveraged = averageRSM(BigROIRSM, interpSets);
 EVCRSMAveraged = averageRSM(EVCRSM, interpSets);
 MVCRSMAveraged = averageRSM(MVCRSM, interpSets);
 VVSRSMAveraged = averageRSM(VVSRSM, interpSets);
+ParietalRSMAveraged = averageRSM(ParietalRSM, interpSets);
+
 
 %plot them
 figure
@@ -629,35 +651,39 @@ title('RSM: VVS voxels'), xlabel('Object number'), ylabel('Interpolation number'
 
 sgtitle('RSMs, averaged (post-normalization) over all interpolated stimulus sets')
 
+%parietal
+figure, imagesc(ParietalRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+title('RSM: Parietal voxels'), xlabel('Object number'), ylabel('Interpolation number')
 
 
 %% DO MLDS ON THE AVERAGED RSMs AND PLOT IT:
 figure, subplot(1,4,1), hold on
-doMLDS(EVCRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
+doMLDS(EVCRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
 title('Early visual cortex')
 
 subplot(1,4,2), hold on
-doMLDS(MVCRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
+doMLDS(MVCRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
 title('Mid-level visual cortex')
 
 subplot(1,4,3), hold on
-doMLDS(VVSRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
+doMLDS(VVSRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
 title('Ventral visual cortex')
 
 subplot(1,4,4), hold on
-doMLDS(BigROIRSMAveraged, mldsReps, colors, task, {interpSets{1}} ,1)
+doMLDS(BigROIRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
 title('Entire cortex')
 
 sgtitle('MLDS for averaged interpolations in different areas')
 
-
-
-
-
+%do parietal
+figure, hold on
+doMLDS(ParietalRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
+title('Parietal RSM)')
 
 
 
 %% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%%
+
 
 keyboard
 
@@ -669,6 +695,45 @@ keyboard
 
 
 
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%% plot roi reliability
+%%%%%%%%%%%%%%%%%%%%%%%%%
+function plotROIReliability(roi, numStimRepeats, stimNames)
+    r = [];
+    for numVoxels = 1:(numStimRepeats/2)
+        corrVals = [];
+        for stimulus = 1:length(stimNames)
+            corrVals1stim = [];
+            for repeat = 1:500
+                subsetVoxels = randsample(1:numStimRepeats, numVoxels*2);
+                subset = roi{stimulus}(:,subsetVoxels);
+                averageHalf1 = mean(subset(:,1:numVoxels),2);
+                averageHalf2 = mean(subset(:,(1+numVoxels):end),2);
+                corrVal = corr(averageHalf1,averageHalf2);
+                corrVals = [corrVals corrVal];
+                corrVals1stim = [corrVals1stim corrVal];
+            end
+            scatter(numVoxels, mean(corrVals1stim), 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.1, 'MarkerEdgeAlpha', 0.1);
+        end
+        scatter(numVoxels, mean(corrVals), 60, 'MarkerFaceColor', 'r', 'MarkerEdgeColor', 'w')
+        r = [r mean(corrVals)]; y = r; x = 1:(numStimRepeats/2);
+    end
+    
+    xlabel(('Number of scans in averages'))
+    ylabel('Split half reliability')
+    
+    opt = fminsearch(@(p) sum((y - (p(1)*sqrt(x) + p(2))).^2), [1, 0]);
+    a = opt(1); b = opt(2);
+    y_fit = a * sqrt(x) + b;
+    R2 = 1 - sum((y - y_fit).^2) / sum((y - mean(y)).^2);
+    plot(y_fit)
+    ylim([0 .8])
 
 
 
@@ -795,7 +860,7 @@ function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSe
             initialParams = [psi, sigma];
             
             %options
-            options = optimset('fminsearch'); options.MaxFunEvals = 10000; options.MaxIter = 5000; options.Display = 'off';
+            options = optimset('fminsearch'); options.MaxFunEvals = 20000; options.MaxIter = 20000; options.Display = 'off';
             %options.TolFun = .0001;
             
             %search for params
@@ -898,6 +963,33 @@ function totalProb = computeLoss(params, ims, responses)
 %%
 
 
+
+
+
+% %% look at the reliability of the patterns for single trials in different areas
+% figure,
+% 
+% %make roisToCombine
+% roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > nVoxelsNeeded); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
+% singleTrialCorrs = {};
+% 
+% %go through each ROI, plot the average RSM for INDIVIDUAL presentations of the same stimuli
+% %this should be read as how consistent the ROI is
+% for roi = roisToCombine;
+%     singleTrialCorrelations = zeros(30);
+%     for stim = 1:length(task{1}.stimNames);
+%         singleTrialCorrelations = singleTrialCorrelations + corr(allBetasCombinedFiltered{roi}{stim})/length(task{1}.stimNames);
+%         singleTrialCorrs{roi}{stim} = corr(allBetasCombinedFiltered{roi}{stim});
+%     end
+% 
+%     subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)), hold on
+%     imagesc(singleTrialCorrelations),
+%     colorbar, caxis([-.2 .2])
+%     title(roiNames(roi))
+% end
+% 
+% sgtitle('Reliability by area (individual trial correlations, averaged over all stimuli)')
+% %%
 
 
 
