@@ -292,83 +292,29 @@ close
 % early visual cortex ROI (v1 and v2)
 earlyROIs = [1 3];
 if bigRois, earlyROIs = 1; end
+[allBetasEVCROI, allBetasEVCROIAveraged] = createUsableROIs(earlyROIs, allBetasCombinedFiltered, stimNames);
 
-for stim = 1:length(task{1}.stimNames);
-    allBetasEVCROI{stim} = [];
-    for roi = earlyROIs
-        allBetasEVCROI{stim} = [allBetasEVCROI{stim}; allBetasCombinedFiltered{roi}{stim}];
-    end
-end
-
-%average EVC roi
-for interp = 1:length(task{1}.stimNames)
-    allBetasEVCROIAveraged{interp} = mean(allBetasEVCROI{interp}, 2);
-end
 
 % mid-visual cortex ROIS (v3, v4, etc)
 midROIs = [5 7 9 11 17 19];
 if bigRois, midROIs = 3; end
+[allBetasMVCROI, allBetasMVCROIAveraged] = createUsableROIs(midROIs, allBetasCombinedFiltered, stimNames);
 
-for stim = 1:length(task{1}.stimNames);
-    allBetasMVCROI{stim} = [];
-    for roi = midROIs
-        allBetasMVCROI{stim} = [allBetasMVCROI{stim}; allBetasCombinedFiltered{roi}{stim}];
-    end
-end
-
-%average MVC roi
-for interp = 1:length(task{1}.stimNames)
-    allBetasMVCROIAveraged{interp} = mean(allBetasMVCROI{interp}, 2);
-end
 
 % "ventral" visual ROIs (IT, FFA, LO, etc).
 lateROIs = [13 15 21 23 25 27 29 31 33 39 41 45 47 49 51];
 if bigRois, lateROIs = 5; end
-
-for stim = 1:length(task{1}.stimNames);
-    allBetasVVSROI{stim} = [];
-    for roi = lateROIs
-        allBetasVVSROI{stim} = [allBetasVVSROI{stim}; allBetasCombinedFiltered{roi}{stim}];
-    end
-end
-
-%average VVS roi
-for interp = 1:length(task{1}.stimNames)
-    allBetasVVSROIAveraged{interp} = mean(allBetasVVSROI{interp}, 2);
-end
+[allBetasVVSROI, allBetasVVSROIAveraged] = createUsableROIs(lateROIs, allBetasCombinedFiltered, stimNames);
 
 
 % "parietal" visual ROIs
 parietalROIs = [63 65 69 71 73 81 83 85 87];
 if bigRois, parietalROIs = 7; end
-
-%lateROIs = [13 15 17 19 21 23 25 27 29 31 33 39 41 45 47 49 51];
-for stim = 1:length(task{1}.stimNames);
-    allBetasParietalROI{stim} = [];
-    for roi = parietalROIs
-        allBetasParietalROI{stim} = [allBetasParietalROI{stim}; allBetasCombinedFiltered{roi}{stim}];
-    end
-end
-
-%average parietal roi
-for interp = 1:length(task{1}.stimNames)
-    allBetasParietalROIAveraged{interp} = mean(allBetasParietalROI{interp}, 2);
-end
-
+[allBetasParietalROI, allBetasParietalROIAveraged] = createUsableROIs(parietalROIs, allBetasCombinedFiltered, stimNames);
 
 
 %big roi - all ROIs to combine.
-for stim = 1:length(task{1}.stimNames);
-    allBetasBigROI{stim} = [];
-    for roi = [earlyROIs midROIs lateROIs];
-        allBetasBigROI{stim} = [allBetasBigROI{stim}; allBetasCombinedFiltered{roi}{stim}];
-    end
-end
-
-%average big roi
-for interp = 1:length(task{1}.stimNames)
-    allBetasBigROIAveraged{interp} = mean(allBetasBigROI{interp}, 2);
-end
+[allBetasBigROI, allBetasBigROIAveraged] = createUsableROIs([earlyROIs midROIs lateROIs], allBetasCombinedFiltered, stimNames);
 
 
 
@@ -422,150 +368,28 @@ plotROIReliability(allBetasVVSROI, numStimRepeats, stimNames)
 
 
 %% MAKE RSMS FOR ALL ROIS, EVC ROIS, MVC ROIS, AND VVS ROIS.
-% RSM of the big ROI, combining all the small ROIS
-    %create empty matrices
-    averagedReps = zeros(length(stimNames), size(allBetasBigROI{1},1));
-    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
-    
-    %go through and add each averaged stimulus response to the empty average matrix
-    for stim = 1:length(task{1}.stimNames);
-        %get the average of each of the halves of the stimuli (even or odds)
-        averagedRepsHalf1(stim,:) = mean(allBetasBigROI{stim}(:,1:2:end),2);
-        averagedRepsHalf2(stim,:) = mean(allBetasBigROI{stim}(:,2:2:end),2);
-    end
-    
-    %rename everything according to earlier convention
-    allBetasBigROIAveragedHalf1 = averagedRepsHalf1; allBetasBigROIAveragedHalf2 = averagedRepsHalf2;
-    
-    %make the RSM using halves.
-    half1 = corr(allBetasBigROIAveragedHalf1', allBetasBigROIAveragedHalf2');
-    half2 = corr(allBetasBigROIAveragedHalf2', allBetasBigROIAveragedHalf1');
-    BigROIRSM = (half1+half2)/2;
-    
-    %plot it
-    figure, subplot(2,2,1), imagesc(BigROIRSM),
-    colormap(hot), colorbar, caxis([-1 1])
-    title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
-    xlabel('Object number'), ylabel('Object number')
-    xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
-    drawLines
 
+% RSM of the big ROI, combining all the small ROIS
+figure, subplot(2,2,1)
+bigROIRSM = calculateRSM(allBetasBigROI, stimNames);
 
 
 % RSM of the EVC ROI
-    %create empty matrices
-    averagedReps = zeros(length(stimNames), size(allBetasEVCROI{1},1));
-    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
-    
-    %go through and add each averaged stimulus response to the empty average matrix
-    for stim = 1:length(task{1}.stimNames);
-        %get the average of each of the halves of the stimuli (even or odds)
-        averagedRepsHalf1(stim,:) = mean(allBetasEVCROI{stim}(:,1:2:end),2);
-        averagedRepsHalf2(stim,:) = mean(allBetasEVCROI{stim}(:,2:2:end),2);
-    end
-    
-    %rename everything according to earlier convention
-    allBetasEVCROIAveragedHalf1 = averagedRepsHalf1; allBetasEVCROIAveragedHalf2 = averagedRepsHalf2;
-    
-    %make the RSM using halves.
-    half1 = corr(allBetasEVCROIAveragedHalf1', allBetasEVCROIAveragedHalf2');
-    half2 = corr(allBetasEVCROIAveragedHalf2', allBetasEVCROIAveragedHalf1');
-    EVCRSM = (half1+half2)/2;
-    
-    %plot it
-    subplot(2,2,2), imagesc(EVCRSM),
-    colormap(hot), colorbar, caxis([-1 1])
-    title('RSM: EVC. Correlation between averaged patterns of activity')
-    xlabel('Object number'), ylabel('Object number')
-    xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
-    drawLines
-
-
+subplot(2,2,2)
+EVCRSM = calculateRSM(allBetasEVCROI, stimNames);
 
 % RSM of the mid ROI
-    %create empty matrices
-    averagedReps = zeros(length(stimNames), size(allBetasMVCROI{1},1));
-    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
-    
-    %go through and add each averaged stimulus response to the empty average matrix
-    for stim = 1:length(task{1}.stimNames);
-        %get the average of each of the halves of the stimuli (even or odds)
-        averagedRepsHalf1(stim,:) = mean(allBetasMVCROI{stim}(:,1:2:end),2);
-        averagedRepsHalf2(stim,:) = mean(allBetasMVCROI{stim}(:,2:2:end),2);
-    end
-    
-    %rename everything according to earlier convention
-    allBetasMVCROIAveragedHalf1 = averagedRepsHalf1; allBetasMVCROIAveragedHalf2 = averagedRepsHalf2;
-    
-    %make the RSM using halves.
-    half1 = corr(allBetasMVCROIAveragedHalf1', allBetasMVCROIAveragedHalf2');
-    half2 = corr(allBetasMVCROIAveragedHalf2', allBetasMVCROIAveragedHalf1');
-    MVCRSM = (half1+half2)/2;
-    
-    %plot it
-    subplot(2,2,3), imagesc(MVCRSM),
-    colormap(hot), colorbar, caxis([-1 1])
-    title('RSM: MVC. Correlation between averaged patterns of activity')
-    xlabel('Object number'), ylabel('Object number')
-    xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
-    drawLines
+subplot(2,2,3)
+MVCRSM = calculateRSM(allBetasMVCROI, stimNames);
 
 
 % RSM of the VVC ROI
-    %create empty matrices
-    averagedReps = zeros(length(stimNames), size(allBetasVVSROI{1},1));
-    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
-    
-    %go through and add each averaged stimulus response to the empty average matrix
-    for stim = 1:length(task{1}.stimNames);
-        %get the average of each of the halves of the stimuli (even or odds)
-        averagedRepsHalf1(stim,:) = mean(allBetasVVSROI{stim}(:,1:2:end),2);
-        averagedRepsHalf2(stim,:) = mean(allBetasVVSROI{stim}(:,2:2:end),2);
-    end
-    
-    %rename everything according to earlier convention
-    allBetasVVSROIAveragedHalf1 = averagedRepsHalf1; allBetasVVSROIAveragedHalf2 = averagedRepsHalf2;
-    
-    %make the RSM using halves.
-    half1 = corr(allBetasVVSROIAveragedHalf1', allBetasVVSROIAveragedHalf2');
-    half2 = corr(allBetasVVSROIAveragedHalf2', allBetasVVSROIAveragedHalf1');
-    VVSRSM = (half1+half2)/2;
-    
-    %plot it
-    subplot(2,2,4), imagesc(VVSRSM),
-    colormap(hot), colorbar, caxis([-1 1])
-    title('RSM: VVS. Correlation between averaged patterns of activity')
-    xlabel('Object number'), ylabel('Object number')
-    xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
-    drawLines
+subplot(2,2,4),
+VVSRSM = calculateRSM(allBetasVVSROI, stimNames);
 
 % RSM of the Parietal ROI
-    %create empty matrices
-    averagedReps = zeros(length(stimNames), size(allBetasParietalROI{1},1));
-    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
-    
-    %go through and add each averaged stimulus response to the empty average matrix
-    for stim = 1:length(task{1}.stimNames);
-        %get the average of each of the halves of the stimuli (even or odds)
-        averagedRepsHalf1(stim,:) = mean(allBetasParietalROI{stim}(:,1:2:end),2);
-        averagedRepsHalf2(stim,:) = mean(allBetasParietalROI{stim}(:,2:2:end),2);
-    end
-    
-    %rename everything according to earlier convention
-    allBetasParietalROIAveragedHalf1 = averagedRepsHalf1; allBetasParietalROIAveragedHalf2 = averagedRepsHalf2;
-    
-    %make the RSM using halves.
-    half1 = corr(allBetasParietalROIAveragedHalf1', allBetasParietalROIAveragedHalf2');
-    half2 = corr(allBetasParietalROIAveragedHalf2', allBetasParietalROIAveragedHalf1');
-    ParietalRSM = (half1+half2)/2;
-    
-    %plot it
-    figure, imagesc(ParietalRSM),
-    colormap(hot), colorbar, caxis([-1 1])
-    title('RSM: Parietal. Correlation between averaged patterns of activity')
-    xlabel('Object number'), ylabel('Object number')
-    xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
-    drawLines
+figure
+ParietalRSM = calculateRSM(allBetasParietalROI, stimNames);
 
 
 
@@ -598,6 +422,7 @@ if clean, close, end
 
 
 %% 2-WAY CLASSIFICATION BETWEEN INTERPOLATION SETS
+
 %classify EVC
 figure
 doClassification(allBetasEVCROI, colors, task, numStimRepeats, interpSets)
@@ -612,8 +437,9 @@ if clean, close, end
 
 
 %classify VVS
-
-
+figure
+doClassification(allBetasVVSROI, colors, task, numStimRepeats, interpSets)
+sgtitle('Classification: VVC')
 if clean, close, end
 
 %classify Parietal
@@ -656,7 +482,9 @@ figure, imagesc(ParietalRSMAveraged), colormap(hot), colorbar, caxis([0 1])
 title('RSM: Parietal voxels'), xlabel('Object number'), ylabel('Interpolation number')
 
 
+
 %% DO MLDS ON THE AVERAGED RSMs AND PLOT IT:
+
 figure, subplot(1,4,1), hold on
 doMLDS(EVCRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
 title('Early visual cortex')
@@ -694,7 +522,59 @@ keyboard
 
 
 
+%%%%%%%%%%%%%%%%%%
+%% createUsableROIs
+%%%%%%%%%%%%%%%%%%
 
+function [allBetasROI allBetasROIAveraged] = createUsableROIs(ROIs, allBetasCombinedFiltered, stimNames);
+
+%combine the listed ROIs
+for stim = 1:length(stimNames);
+    allBetasROI{stim} = [];
+    for roi = ROIs
+        allBetasROI{stim} = [allBetasROI{stim}; allBetasCombinedFiltered{roi}{stim}];
+    end
+end
+
+%average roi
+for interp = 1:length(stimNames)
+    allBetasROIAveraged{interp} = mean(allBetasROI{interp}, 2);
+end
+
+
+
+
+
+%%%%%%%%%%%%%
+%% Calculate RSMs %%
+%%%%%%%%%%%%%%%%%%%%
+function RSM = calculateRSM(voxels, stimNames)
+    %create empty matrices
+    averagedReps = zeros(length(stimNames), size(voxels{1},1));
+    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
+    
+    %go through and add each averaged stimulus response to the empty average matrix
+    for stim = 1:length(stimNames);
+        %get the average of each of the halves of the stimuli (even or odds)
+        averagedRepsHalf1(stim,:) = mean(voxels{stim}(:,1:2:end),2);
+        averagedRepsHalf2(stim,:) = mean(voxels{stim}(:,2:2:end),2);
+    end
+    
+    %rename everything according to earlier convention
+    allBetasAveragedHalf1 = averagedRepsHalf1; allBetasAveragedHalf2 = averagedRepsHalf2;
+    
+    %make the RSM using halves.
+    half1 = corr(allBetasAveragedHalf1', allBetasAveragedHalf2');
+    half2 = corr(allBetasAveragedHalf2', allBetasAveragedHalf1');
+    RSM = (half1+half2)/2;
+    
+    %plot it
+    imagesc(RSM),
+    colormap(hot), colorbar, caxis([-1 1])
+    title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
+    xlabel('Object number'), ylabel('Object number')
+    xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
+    drawLines
 
 
 
@@ -734,9 +614,6 @@ function plotROIReliability(roi, numStimRepeats, stimNames)
     R2 = 1 - sum((y - y_fit).^2) / sum((y - mean(y)).^2);
     plot(y_fit)
     ylim([0 .8])
-
-
-
 
 
 
@@ -895,33 +772,6 @@ function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSe
 
 
 
-%%
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%
@@ -961,6 +811,11 @@ function totalProb = computeLoss(params, ims, responses)
 
 
 %%
+
+
+
+
+
 
 
 
