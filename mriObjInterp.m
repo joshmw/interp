@@ -29,7 +29,7 @@ function mriObjInterp(varargin)
 %% LOAD THE DATA
 %get args
 getArgs(varargin, {'reliabilityCutoff=.30', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
-    'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)', 'clean=1'});
+    'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(8/10)', 'clean=1'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE rois shold be responsive
@@ -289,6 +289,8 @@ close
 
 
 %% MAKE DIFFERENT LARGE ROIS (EARLY, MIDDLE, VENTRAL) AND ALSO MAKE AVERAGED VERSIONS
+stimNames = [1:24];1
+
 % early visual cortex ROI (v1 and v2)
 earlyROIs = [1 3];
 if bigRois, earlyROIs = 1; end
@@ -320,7 +322,6 @@ if bigRois, parietalROIs = 7; end
 
 %% PLOT RELIABILITY OF PATTERNS OF DIFFERENT STIMULI
 %stimNames = task{1}.stimfile.stimulus.objNames;
-stimNames = [1:24];
 
 figure, hold on
 colors = cool(numBetasEachScan/2);
@@ -371,7 +372,7 @@ plotROIReliability(allBetasVVSROI, numStimRepeats, stimNames)
 
 % RSM of the big ROI, combining all the small ROIS
 figure, subplot(2,2,1)
-bigROIRSM = calculateRSM(allBetasBigROI, stimNames);
+BigROIRSM = calculateRSM(allBetasBigROI, stimNames);
 
 
 % RSM of the EVC ROI
