@@ -10,12 +10,10 @@ function mriObjInterp(varargin)
 %  Arguments:
 %    reliabilityCutoff: split-half correlation of betas used to select voxels for analysis
 %    r2cutoff: r2 cutoff (from glmsingle) used to select voxels for analysis
-%    stdCutoff: remove voxels whos betas in any single condition have a standard deviation higher than this value
 %    shuffleData: set to 1 to randomize condition labels in the very beginning (control measure)
 %    zscorebetas: set to 1 to zscore the betas in each run
 %    numBoots: number of bootstraps for split-half correlation analysis
 %    nVoxelsNeeded: Number of voxels an ROI needs to have to be included in the analysis (# voxels that meet reliability cutoff)
-%    showAvgMDS/showDistancesSingleTrial: flags to show analyses I don't think are relevant
 %    mldsReps: number of mlds bootstraps. if set above 1, when averaging each condition, will average a random subset of trials instead of all
 %    plotBig: plots things in their own graphs rather than as subplots
 %    doROImlds: flag for if you want to do mlds in each ROI. takes a while to do this, so set to 0 to save time
@@ -28,12 +26,13 @@ function mriObjInterp(varargin)
 
 %% LOAD THE DATA
 %get args
-getArgs(varargin, {'reliabilityCutoff=.30', 'r2cutoff=0', 'stdCutoff=100', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20' 'showAvgMDS=50', 'showDistancesSingleTrials=0', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
-    'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(8/10)', 'clean=1'});
+getArgs(varargin, {'reliabilityCutoff=.30', 'r2cutoff=0', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+    'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)', 'clean=1'});
 
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE rois shold be responsive
 %load the data
+keyboard
 
 cd('~/data/interp/s0603/betaFiles')
 %task{1} = load('s0603Task1Parietal.mat');
@@ -230,27 +229,9 @@ end
 %combine all of the betas from each hemisphere
 for roi = 1:length(roiNames)
     for stimName = 1:length(task{1}.stimNames)
-        allBetasCombined{roi}{stimName} = [allBetas{1}{roi}{stimName}; allBetas{2}{roi}{stimName}];
+        allBetasCombinedFiltered{roi}{stimName} = [allBetas{1}{roi}{stimName}; allBetas{2}{roi}{stimName}];
     end
 end
-
-%determine the std of each voxel's response to repeated presentations, averaged over all stimuli types
-for roi = 1:length(roiNames)
-    avgStd = 0;
-    for stim = 1:length(task{1}.stimNames)
-        avgStd = avgStd + std(allBetasCombined{roi}{stim}');
-    end
-    voxelStd{roi} = avgStd/length(task{1}.stimNames);
-end
-
-%filter out voxels that are really noisy (high std in betas for repeats)
-%YOU DON'T NEED TO DO THIS IS Z-SCORING! which you should be doing. just set stdCutoff to high (>5) and it wont do anything.
-for roi = 1:length(roiNames)
-    for stim = 1:length(task{1}.stimNames)
-        allBetasCombinedFiltered{roi}{stim} = allBetasCombined{roi}{stim}(voxelStd{roi} < stdCutoff,:);
-    end
-end
-
 
 
 %% COUNT NUMBER OF VOXELS FOR SUB = 1:2:LENGTH(ROINAMES);
@@ -289,7 +270,7 @@ close
 
 
 %% MAKE DIFFERENT LARGE ROIS (EARLY, MIDDLE, VENTRAL) AND ALSO MAKE AVERAGED VERSIONS
-stimNames = [1:24];1
+stimNames = [1:24];
 
 % early visual cortex ROI (v1 and v2)
 earlyROIs = [1 3];
@@ -373,24 +354,27 @@ plotROIReliability(allBetasVVSROI, numStimRepeats, stimNames)
 % RSM of the big ROI, combining all the small ROIS
 figure, subplot(2,2,1)
 BigROIRSM = calculateRSM(allBetasBigROI, stimNames);
-
+title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
 
 % RSM of the EVC ROI
 subplot(2,2,2)
 EVCRSM = calculateRSM(allBetasEVCROI, stimNames);
+title('RSM: EVC voxels. Correlation between averaged patterns of activity')
 
 % RSM of the mid ROI
 subplot(2,2,3)
 MVCRSM = calculateRSM(allBetasMVCROI, stimNames);
-
+title('RSM: Mid-ventral voxels. Correlation between averaged patterns of activity')
 
 % RSM of the VVC ROI
 subplot(2,2,4),
 VVSRSM = calculateRSM(allBetasVVSROI, stimNames);
+title('RSM: Ventral voxels. Correlation between averaged patterns of activity')
 
 % RSM of the Parietal ROI
 figure
 ParietalRSM = calculateRSM(allBetasParietalROI, stimNames);
+title('RSM: Parietal voxels. Correlation between averaged patterns of activity')
 
 
 
@@ -572,7 +556,6 @@ function RSM = calculateRSM(voxels, stimNames)
     %plot it
     imagesc(RSM),
     colormap(hot), colorbar, caxis([-1 1])
-    title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
     xlabel('Object number'), ylabel('Object number')
     xticklabels(stimNames), xticks([1:length(stimNames)]), yticklabels(stimNames), yticks([1:length(stimNames)])
     drawLines
@@ -762,7 +745,6 @@ function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSe
             xlim([1 6]);
             xlabel('Synthesized interpolation value')
             ylabel('Neural distance value')
-            if set == 1; title('Grass to leaves mlds'); elseif set == 2, title('Lemons to bananas mlds'); elseif set == 3, title('Petals to buttercream mlds'); elseif set == 4, title('Acorns to redwood mlds'),end
         
             title(strcat(task{1}.stimfile.stimulus.interpNames{set}{1}, ' --> ', task{1}.stimfile.stimulus.interpNames{set}{2}))
 
