@@ -23,8 +23,8 @@ function mriObjInterp(varargin)
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
-getArgs(varargin, {'reliabilityCutoff=.30', 'r2cutoff=0', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
-    'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)', 'clean=1'});
+getArgs(varargin, {'reliabilityCutoff=.30', 'r2cutoff=0', 'shuffleData=0', 'zscorebetas=1', 'numBoots=100', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+    'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)', 'clean=1', 'comebineData=0'});
 
 
 %% LOAD AND PROCESS THE DATA
@@ -33,26 +33,35 @@ getArgs(varargin, {'reliabilityCutoff=.30', 'r2cutoff=0', 'shuffleData=0', 'zsco
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE rois shold be responsive
 %load the data
 
-dataPath = ('~/data/interp/s0603/betaFiles');
-fileNames{1} = 's0603Task1BigROIs.mat';
-fileNames{2} = 's0603Task2BigROIs.mat';
-bigROIs = 1;
+%uncomment for subject s0603
+dataPath = ('~/data/interp/s0603/betaFiles'); fileNames{1} = 's0603Task1BigROIs.mat'; fileNames{2} = 's0603Task2BigROIs.mat'; bigRois = 1;
 
-%dataPath = ('~/data/interp/s0604/betaFiles');
-%fileNames{1} = 's0604Task1BigROIs.mat';
-%fileNames{2} = 's0604Task2BigROIs.mat';
-%bigROIs = 1;
+%uncomment for subject s0604
+%dataPath = ('~/data/interp/s0604/betaFiles'); fileNames{1} = 's0604Task1BigROIs.mat'; fileNames{2} = 's0604Task2BigROIs.mat'; bigROIs = 1;
 
 
 % run the command
-[task, roiNames, allBetasCombinedFiltered] =... 
+[task, allBetasCombinedFiltered, roiNames] =... 
     processData(reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, ...
     numBetasEachScan, numScansInGLM, numStimRepeats, truncateTrials, dataPath, fileNames);
+
+%put the data here for now. In the future I will update this so you can combine multiple runs by iterating through the data object.
+data{1} = allBetasCombinedFiltered;
+
+
+
+
+%% COMBINE THE DATA
+
+%if there is only 1 subject, you are combining it with itself.
+allBetasCombinedFiltered = combineData(data);
+
 
 
 %% MAKE DIFFERENT LARGE ROIS (EARLY, MIDDLE, VENTRAL) AND ALSO MAKE AVERAGED VERSIONS
 stimNames = [1:24];
 interpSets = {[1:6], [7:12], [13:18], [19:24]};
+colors = cool(numBetasEachScan/2);
 
 % early visual cortex ROI (v1 and v2)
 earlyROIs = [1 3];
@@ -558,7 +567,7 @@ function totalProb = computeLoss(params, ims, responses)
 %%%%%%%%%%%%%%%%%%
 %% processData
 %%%%%%%%%%%%%%%%%%
-function [task, averagedBetas, allBetasCombinedFiltered] = processData(...
+function [task, allBetasCombinedFiltered, roiNames] = processData(...
     reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, ...
     numBetasEachScan, numScansInGLM, numStimRepeats, truncateTrials, dataPath, fileNames);
 
@@ -779,6 +788,7 @@ for roi = roisToCombine;
 end
  
 sgtitle('Reliability by area (individual trial correlations, averaged over all stimuli)')
+close
 
 
 % plot reliability of different patterns of stimuli
@@ -806,11 +816,25 @@ xticks(1:length(roisToCombine)); xticklabels(roiNames(roisToCombine));
 title('Median single-trial correlation by area (by stimulus)');
 %legend(stimNames);
 
-%%
 
 
 
+%%%%%%%%%%%%%%%%%
+%% combineData %%
+%%%%%%%%%%%%%%%%%
+function allBetasCombinedFiltered = combineData(data);
 
+%get first subjects all betas combined filtered
+allBetasCombinedFiltered = data{1}
+
+%go through addition subjects, if any
+for subject = 2:length(data)
+    for roi = 1:length(data{subject})
+        for stimulus = 1:length(data{subject}{roi})
+            allBetasCombinedFiltered{roi}{stimulu} = [allBetasCombinedFiltered{roi}{stimulus}; data{subject}{roi}{stimulus}];
+        end
+    end
+end
 
 
 
