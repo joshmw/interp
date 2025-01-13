@@ -22,255 +22,37 @@ function mriObjInterp(varargin)
 %    numStimRepeats: Number of repeats of each stimulus (how many times shown in scanner)
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
-
-
-%% LOAD THE DATA
 %get args
 getArgs(varargin, {'reliabilityCutoff=.30', 'r2cutoff=0', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)', 'clean=1'});
 
+
+%% LOAD AND PROCESS THE DATA
+
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE rois shold be responsive
 %load the data
-keyboard
 
-cd('~/data/interp/s0603/betaFiles')
-%task{1} = load('s0603Task1Parietal.mat');
-%task{2} = load('s0603Task2Parietal.mat');
-%bigRois = 0;
-task{1} = load('s0603Task1BigROIs.mat');
-task{2} = load('s0603Task2BigROIs.mat');
-bigRois = 1;
+dataPath = ('~/data/interp/s0603/betaFiles');
+fileNames{1} = 's0603Task1BigROIs.mat';
+fileNames{2} = 's0603Task2BigROIs.mat';
+bigROIs = 1;
 
-
-%cd('~/data/interp/s0604/betaFiles')
-%task{1} = load('s0604Task1.mat');
-%task{2} = load('s0604Task2.mat');
-%bigRois = 0;
-%task{1} = load('s0604Task1BigROIs.mat');
-%task{2} = load('s0604Task2BigROIs.mat');
-%bigRois = 1;
-
-interpSets = {[1:6], [7:12], [13:18], [19:24]};
+%dataPath = ('~/data/interp/s0604/betaFiles');
+%fileNames{1} = 's0604Task1BigROIs.mat';
+%fileNames{2} = 's0604Task2BigROIs.mat';
+%bigROIs = 1;
 
 
-%fix the stim names thing - remove the duplicate of the blanks (in this case, 1 8 15 22
-for taskNum = 1:2,
-    blanks = [1 8 15 22]; for blank = blanks, task{taskNum}.stimNames(blank) = []; end
-end
-
-%swap the roiNums for task 2 so that we can do both hemispheres together
-odds = mod(task{2}.whichROI,2) == 1;
-evens = ~odds;
-task{2}.whichROI(evens) = task{2}.whichROI(evens) - 1;
-task{2}.whichROI(odds) = task{2}.whichROI(odds) + 1;
-
-%rename rois to contra and ipso so we can combine
-roiNames = task{1}.roiNames;
-for roi = 1:length(roiNames)
-    if roiNames{roi}(1) == 'l'
-        string = strcat('contra ', roiNames{roi}(2:end));
-        roiNames{roi} = strrep(string,'_',' ');
-    else
-        string = strcat('ipso ', roiNames{roi}(2:end));
-        roiNames{roi} = strrep(string,'_',' ');
-    end
-end
-
-
-%% if you want to truncate the data (fewer repeats), do so here by setting truncateTrials <1
-%note that we calculated reliability before truncating. Might want to switch.
-numStimRepeats = numStimRepeats * truncateTrials;
-numScansInGLM = numScansInGLM * truncateTrials;
-for taskNum = 1:2,
-    task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,1:(numBetasEachScan*numScansInGLM));
-    task{taskNum}.trial_conditions = task{taskNum}.trial_conditions(1:(numBetasEachScan*numScansInGLM));
-    %you can make it backwards if you uncomment these. the proportion included will flip (.7 truncate -> include last .3 of data). DO NOT UNCOMMENT if not truncating.
-    %task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,((numBetasEachScan*numScansInGLM)+1):end);
-    %task{taskNum}.trial_conditions = task{taskNum}.trial_conditions((numBetasEachScan*numScansInGLM+1):end);
-end
-
-
-%% ZSCORE THE DATA AND GET AVERAGE AMPLITUDE VALUE
-for taskNum = 1:2
-    %get betas
-    task{taskNum}.amplitudes = squeeze(task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd);
-
-    %zscore if you want
-    if zscorebetas
-        for scan = 1:numScansInGLM
-            %zscore by scan
-            task{taskNum}.amplitudes(:,(1 + ((scan-1)*numBetasEachScan)):(scan*numBetasEachScan)) = zscore(task{taskNum}.amplitudes(:,(1 + ((scan-1)*numBetasEachScan)):(scan*numBetasEachScan)), 0, 2);
-        end
-    end
-
-    %average
-    for stim = 1:length(task{taskNum}.stimNames)
-        task{taskNum}.averaged_amplitudes(:,stim) = nanmean(task{taskNum}.amplitudes(:,(task{taskNum}.trial_conditions == stim)),2);
-    end
-end
-
-
-%% CALCULATE THE RELIABILITY OF INDIVIDUAL VOXELS (CONSISTENCY OF BETA VALUES ACROSS PRESENTATIONS)
-for taskNum = 1:2;
-    task{taskNum}.betas = task{taskNum}.amplitudes;
-    wb = waitbar(0, 'Starting reliability bootstraps');
-    for boot = 1:numBoots
-        condition_amps = {};
-        split1_amps = {};
-        split2_amps = {};
-        %
-        for cond = 1:length(task{taskNum}.stimNames);
-            condition_amps{cond} = task{taskNum}.betas(:,task{taskNum}.trial_conditions==cond);
-            nTrials = size(condition_amps{cond},2);
-            
-            trialorder = randperm(nTrials);
-            split1_amps{end+1} = condition_amps{cond}(:,trialorder(1:floor(nTrials/2)));
-            split2_amps{end+1} = condition_amps{cond}(:,trialorder((floor(nTrials/2)+1):end));
-        end
-        
-        s1a = cellfun(@(x) mean(x,2), split1_amps, 'un', 0);
-        s2a = cellfun(@(x) mean(x,2), split2_amps, 'un', 0);
-        
-        s1a = cat(2, s1a{:});
-        s2a = cat(2, s2a{:});
-        reliability(:,boot) = diag(corr(s1a', s2a'));
-        waitbar(boot/numBoots, wb, sprintf('Reliability bootstraps (half: %i): %d %%', taskNum, floor(boot/numBoots*100)))
-    end
-    close(wb)
-    task{taskNum}.allBootReliability = reliability;
-    task{taskNum}.reliability = mean(reliability,2);
-end
-
-
-%% PARTITION BY ROI AND FILTER BY VOXEL RELIABILITY
-for taskNum = 1:2
-    for roi = 1:length(task{taskNum}.roiNames);
-        %face responses
-        task{taskNum}.averagedBetas{roi} = task{taskNum}.averaged_amplitudes((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),:);
-    end
-end
-
-% combine hemispheres in averaged betas
-for roi = 1:length(roiNames)
-    averagedBetas{roi} = [task{1}.averagedBetas{roi}; task{2}.averagedBetas{roi}];
-end
-
-
-
-%% PLOT SPLIT HALF RELIABILITY, R2, AND BETA AMPLITUDES BY ROI
-%plot all the reliabilities with the average
-figure, 
-if ~plotBig, subplot(3,1,1), hold on, else, figure, hold on, end
-for roi = 1:length(roiNames)
-    %add the two halves
-    reliability = [task{1}.reliability(task{1}.whichROI == roi); task{2}.reliability(task{2}.whichROI == roi)];
-    %plot all then average
-    scatter(repmat(roi,length(reliability),1), reliability,'k','filled','MarkerFaceAlpha',.05)
-    scatter(roi, median(reliability),72,'r','filled','MarkerEdgeColor','w')
-end
-
-%label
-hline(0,':k')
-xticks(1:length(roiNames))
-xticklabels(roiNames)
-xlabel('ROI name'), ylabel('Voxel reliability')
-ylim([-.5 .5])
-title('Correlation between first half and second half Betas')
-
-%plot the R2 with the average
-if ~plotBig, subplot(3,1,2), hold on, else, figure, hold on, end
-for roi = 1:length(roiNames)
-    r2 = [task{1}.models.FIT_HRF_GLMdenoise_RR.R2(task{1}.whichROI == roi); task{2}.models.FIT_HRF_GLMdenoise_RR.R2(task{2}.whichROI == roi)];
-    scatter(repmat(roi,length(r2),1), r2,'k','filled','MarkerFaceAlpha',.05)
-    scatter(roi, median(r2),72,'r','filled','MarkerEdgeColor','w')
-end
-
-xticks(1:length(roiNames))
-xticklabels(roiNames)
-xlabel('ROI name'), ylabel('Voxel R-squared')
-ylim([-40 40])
-hline(0,':k')
-title('R-Squared of voxels')
-
-%plot the betas for each ROI
-if ~plotBig, subplot(3,1,3), hold on, else, figure, hold on, end
-for roi = 1:length(roiNames)
-    roiBetas = [task{1}.averagedBetas{roi}(:); task{2}.averagedBetas{roi}(:)];
-    scatter(repmat(roi,length(roiBetas),1)', roiBetas,'k','filled','MarkerFaceAlpha',.01);
-    scatter(roi, median(roiBetas),72,'r','filled','MarkerEdgeColor','w');
-end
-
-xticks(1:length(roiNames))
-xticklabels(roiNames)
-xlabel('ROI name'), ylabel('Beta Amplitude')
-ylim([-2 2])
-hline(0,':k')
-title('Beta weights')
-
-
-%% shuffle the data if you want to - this is a flag you can set for control analyses. randomizes the category labels of all the stimuli
-if shuffleData
-    task{1}.trial_conditions = task{1}.trial_conditions(randperm(length(task{1}.trial_conditions)));
-    task{2}.trial_conditions = task{2}.trial_conditions(randperm(length(task{2}.trial_conditions)));
-end
-
-%% PROCESS DATA - FILTER BY RELIABILITY, COMBINE HEMIS
-%first, get all of the betas for individual stim types for rois
-for taskNum = 1:2
-    for roi = 1:length(roiNames);
-        for condition = 1:length(task{1}.stimNames);
-        %get betas for individual trials, filtering by reliability
-            allBetas{taskNum}{roi}{condition} = task{taskNum}.betas((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),task{taskNum}.trial_conditions==condition);
-        end
-    end
-end
-
-%combine all of the betas from each hemisphere
-for roi = 1:length(roiNames)
-    for stimName = 1:length(task{1}.stimNames)
-        allBetasCombinedFiltered{roi}{stimName} = [allBetas{1}{roi}{stimName}; allBetas{2}{roi}{stimName}];
-    end
-end
-
-
-%% COUNT NUMBER OF VOXELS FOR SUB = 1:2:LENGTH(ROINAMES);
-for sub = 1:2:length(roiNames);
-    singleTrials = cat(2, allBetasCombinedFiltered{sub}{1:length(task{1}.stimNames)});
-    if size(singleTrials,1) > 2
-        %save the number of voxels you have
-        numUsableVoxelsByROI(sub) = size(singleTrials,1);
-    end
-end
-
-%make roisToCombine
-roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > nVoxelsNeeded); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
-singleTrialCorrs = {};
-
-%go through each ROI, plot the average RSM for INDIVIDUAL presentations of the same stimuli
-%this should be read as how consistent the ROI is
-figure
-
-for roi = roisToCombine;
-    singleTrialCorrelations = zeros(numStimRepeats);
-    for stim = 1:length(task{1}.stimNames);
-        singleTrialCorrelations = singleTrialCorrelations + corr(allBetasCombinedFiltered{roi}{stim})/length(task{1}.stimNames);
-        singleTrialCorrs{roi}{stim} = corr(allBetasCombinedFiltered{roi}{stim});
-    end
-
-    subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)), hold on
-    imagesc(singleTrialCorrelations),
-    colorbar, caxis([-.2 .2])
-    title(roiNames(roi))
-end
- 
-sgtitle('Reliability by area (individual trial correlations, averaged over all stimuli)')
-close
-
+% run the command
+[task, roiNames, allBetasCombinedFiltered] =... 
+    processData(reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, ...
+    numBetasEachScan, numScansInGLM, numStimRepeats, truncateTrials, dataPath, fileNames);
 
 
 %% MAKE DIFFERENT LARGE ROIS (EARLY, MIDDLE, VENTRAL) AND ALSO MAKE AVERAGED VERSIONS
 stimNames = [1:24];
+interpSets = {[1:6], [7:12], [13:18], [19:24]};
 
 % early visual cortex ROI (v1 and v2)
 earlyROIs = [1 3];
@@ -298,33 +80,6 @@ if bigRois, parietalROIs = 7; end
 
 %big roi - all ROIs to combine.
 [allBetasBigROI, allBetasBigROIAveraged] = createUsableROIs([earlyROIs midROIs lateROIs], allBetasCombinedFiltered, stimNames);
-
-
-
-%% PLOT RELIABILITY OF PATTERNS OF DIFFERENT STIMULI
-%stimNames = task{1}.stimfile.stimulus.objNames;
-
-figure, hold on
-colors = cool(numBetasEachScan/2);
-for stim = 1:length(task{1}.stimNames)
-    y = [];
-    %subplot(4,ceil(length(stimNames)/4),stim), hold on
-
-    for roi = 1:length(roisToCombine);
-        stimSingleTrialCorrs = singleTrialCorrs{roisToCombine(roi)}{stim};
-        %scatter(roi, median(stimSingleTrialCorrs(stimSingleTrialCorrs<1)));
-        y = [y median(stimSingleTrialCorrs(stimSingleTrialCorrs<1))];
-    end
-
-    scatter(1:length(roisToCombine), y, 100, 'MarkerFaceColor', colors(stim,:), 'MarkerEdgeColor', 'w');
-
-
-end
-
-hline(0)
-xticks(1:length(roisToCombine)); xticklabels(roiNames(roisToCombine));
-title('Median single-trial correlation by area (by stimulus)');
-%legend(stimNames);
 
 
 
@@ -404,6 +159,11 @@ doMLDS(allBetasParietalROIAveraged, mldsReps, colors, task, interpSets, 0)
 sgtitle('Parietal mlds')
 if clean, close, end
 
+%do big ROI
+figure
+doMLDS(allBetasBigROIAveraged, mldsReps, colors, task, interpSets, 0)
+sgtitle('All voxels mlds')
+if clean, close, end
 
 
 %% 2-WAY CLASSIFICATION BETWEEN INTERPOLATION SETS
@@ -628,8 +388,6 @@ averagedRSM = mean(normalizedRSM, 3);
 
 
 
-
-
 %%%%%%%
 %% drawLines
 %%%%%%%%%
@@ -793,7 +551,265 @@ function totalProb = computeLoss(params, ims, responses)
     %disp(totalProb)
 
 
+
+
+
+
+%%%%%%%%%%%%%%%%%%
+%% processData
+%%%%%%%%%%%%%%%%%%
+function [task, averagedBetas, allBetasCombinedFiltered] = processData(...
+    reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, ...
+    numBetasEachScan, numScansInGLM, numStimRepeats, truncateTrials, dataPath, fileNames);
+
+
+%load the data
+cd(dataPath);
+task{1} = load(fileNames{1});
+task{2} = load(fileNames{2});
+
+%fix the stim names thing - remove the duplicate of the blanks (in this case, 1 8 15 22
+for taskNum = 1:2,
+    blanks = [1 8 15 22]; for blank = blanks, task{taskNum}.stimNames(blank) = []; end
+end
+
+%swap the roiNums for task 2 so that we can do both hemispheres together
+odds = mod(task{2}.whichROI,2) == 1;
+evens = ~odds;
+task{2}.whichROI(evens) = task{2}.whichROI(evens) - 1;
+task{2}.whichROI(odds) = task{2}.whichROI(odds) + 1;
+
+%rename rois to contra and ipso so we can combine
+roiNames = task{1}.roiNames;
+for roi = 1:length(roiNames)
+    if roiNames{roi}(1) == 'l'
+        string = strcat('contra ', roiNames{roi}(2:end));
+        roiNames{roi} = strrep(string,'_',' ');
+    else
+        string = strcat('ipso ', roiNames{roi}(2:end));
+        roiNames{roi} = strrep(string,'_',' ');
+    end
+end
+
+
+%% if you want to truncate the data (fewer repeats), do so here by setting truncateTrials <1
+%note that we calculated reliability before truncating. Might want to switch.
+numStimRepeats = numStimRepeats * truncateTrials;
+numScansInGLM = numScansInGLM * truncateTrials;
+for taskNum = 1:2,
+    task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,1:(numBetasEachScan*numScansInGLM));
+    task{taskNum}.trial_conditions = task{taskNum}.trial_conditions(1:(numBetasEachScan*numScansInGLM));
+    %you can make it backwards if you uncomment these. the proportion included will flip (.7 truncate -> include last .3 of data). DO NOT UNCOMMENT if not truncating.
+    %task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,((numBetasEachScan*numScansInGLM)+1):end);
+    %task{taskNum}.trial_conditions = task{taskNum}.trial_conditions((numBetasEachScan*numScansInGLM+1):end);
+end
+
+
+%% ZSCORE THE DATA AND GET AVERAGE AMPLITUDE VALUE
+for taskNum = 1:2
+    %get betas
+    task{taskNum}.amplitudes = squeeze(task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd);
+
+    %zscore if you want
+    if zscorebetas
+        for scan = 1:numScansInGLM
+            %zscore by scan
+            task{taskNum}.amplitudes(:,(1 + ((scan-1)*numBetasEachScan)):(scan*numBetasEachScan)) = zscore(task{taskNum}.amplitudes(:,(1 + ((scan-1)*numBetasEachScan)):(scan*numBetasEachScan)), 0, 2);
+        end
+    end
+
+    %average
+    for stim = 1:length(task{taskNum}.stimNames)
+        task{taskNum}.averaged_amplitudes(:,stim) = nanmean(task{taskNum}.amplitudes(:,(task{taskNum}.trial_conditions == stim)),2);
+    end
+end
+
+
+%% CALCULATE THE RELIABILITY OF INDIVIDUAL VOXELS (CONSISTENCY OF BETA VALUES ACROSS PRESENTATIONS)
+for taskNum = 1:2;
+    task{taskNum}.betas = task{taskNum}.amplitudes;
+    wb = waitbar(0, 'Starting reliability bootstraps');
+    for boot = 1:numBoots
+        condition_amps = {};
+        split1_amps = {};
+        split2_amps = {};
+        %
+        for cond = 1:length(task{taskNum}.stimNames);
+            condition_amps{cond} = task{taskNum}.betas(:,task{taskNum}.trial_conditions==cond);
+            nTrials = size(condition_amps{cond},2);
+            
+            trialorder = randperm(nTrials);
+            split1_amps{end+1} = condition_amps{cond}(:,trialorder(1:floor(nTrials/2)));
+            split2_amps{end+1} = condition_amps{cond}(:,trialorder((floor(nTrials/2)+1):end));
+        end
+        
+        s1a = cellfun(@(x) mean(x,2), split1_amps, 'un', 0);
+        s2a = cellfun(@(x) mean(x,2), split2_amps, 'un', 0);
+        
+        s1a = cat(2, s1a{:});
+        s2a = cat(2, s2a{:});
+        reliability(:,boot) = diag(corr(s1a', s2a'));
+        waitbar(boot/numBoots, wb, sprintf('Reliability bootstraps (half: %i): %d %%', taskNum, floor(boot/numBoots*100)))
+    end
+    close(wb)
+    task{taskNum}.allBootReliability = reliability;
+    task{taskNum}.reliability = mean(reliability,2);
+end
+
+
+%% PARTITION BY ROI AND FILTER BY VOXEL RELIABILITY
+for taskNum = 1:2
+    for roi = 1:length(task{taskNum}.roiNames);
+        %face responses
+        task{taskNum}.averagedBetas{roi} = task{taskNum}.averaged_amplitudes((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),:);
+    end
+end
+
+% combine hemispheres in averaged betas
+for roi = 1:length(roiNames)
+    averagedBetas{roi} = [task{1}.averagedBetas{roi}; task{2}.averagedBetas{roi}];
+end
+
+
+
+%% PLOT SPLIT HALF RELIABILITY, R2, AND BETA AMPLITUDES BY ROI
+%plot all the reliabilities with the average
+figure, 
+if ~plotBig, subplot(3,1,1), hold on, else, figure, hold on, end
+for roi = 1:length(roiNames)
+    %add the two halves
+    reliability = [task{1}.reliability(task{1}.whichROI == roi); task{2}.reliability(task{2}.whichROI == roi)];
+    %plot all then average
+    scatter(repmat(roi,length(reliability),1), reliability,'k','filled','MarkerFaceAlpha',.05)
+    scatter(roi, median(reliability),72,'r','filled','MarkerEdgeColor','w')
+end
+
+%label
+hline(0,':k')
+xticks(1:length(roiNames))
+xticklabels(roiNames)
+xlabel('ROI name'), ylabel('Voxel reliability')
+ylim([-.5 .5])
+title('Correlation between first half and second half Betas')
+
+%plot the R2 with the average
+if ~plotBig, subplot(3,1,2), hold on, else, figure, hold on, end
+for roi = 1:length(roiNames)
+    r2 = [task{1}.models.FIT_HRF_GLMdenoise_RR.R2(task{1}.whichROI == roi); task{2}.models.FIT_HRF_GLMdenoise_RR.R2(task{2}.whichROI == roi)];
+    scatter(repmat(roi,length(r2),1), r2,'k','filled','MarkerFaceAlpha',.05)
+    scatter(roi, median(r2),72,'r','filled','MarkerEdgeColor','w')
+end
+
+xticks(1:length(roiNames))
+xticklabels(roiNames)
+xlabel('ROI name'), ylabel('Voxel R-squared')
+ylim([-40 40])
+hline(0,':k')
+title('R-Squared of voxels')
+
+%plot the betas for each ROI
+if ~plotBig, subplot(3,1,3), hold on, else, figure, hold on, end
+for roi = 1:length(roiNames)
+    roiBetas = [task{1}.averagedBetas{roi}(:); task{2}.averagedBetas{roi}(:)];
+    scatter(repmat(roi,length(roiBetas),1)', roiBetas,'k','filled','MarkerFaceAlpha',.01);
+    scatter(roi, median(roiBetas),72,'r','filled','MarkerEdgeColor','w');
+end
+
+xticks(1:length(roiNames))
+xticklabels(roiNames)
+xlabel('ROI name'), ylabel('Beta Amplitude')
+ylim([-2 2])
+hline(0,':k')
+title('Beta weights')
+
+
+%% shuffle the data if you want to - this is a flag you can set for control analyses. randomizes the category labels of all the stimuli
+if shuffleData
+    task{1}.trial_conditions = task{1}.trial_conditions(randperm(length(task{1}.trial_conditions)));
+    task{2}.trial_conditions = task{2}.trial_conditions(randperm(length(task{2}.trial_conditions)));
+end
+
+%% PROCESS DATA - FILTER BY RELIABILITY, COMBINE HEMIS
+%first, get all of the betas for individual stim types for rois
+for taskNum = 1:2
+    for roi = 1:length(roiNames);
+        for condition = 1:length(task{1}.stimNames);
+        %get betas for individual trials, filtering by reliability
+            allBetas{taskNum}{roi}{condition} = task{taskNum}.betas((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),task{taskNum}.trial_conditions==condition);
+        end
+    end
+end
+
+%combine all of the betas from each hemisphere
+for roi = 1:length(roiNames)
+    for stimName = 1:length(task{1}.stimNames)
+        allBetasCombinedFiltered{roi}{stimName} = [allBetas{1}{roi}{stimName}; allBetas{2}{roi}{stimName}];
+    end
+end
+
+
+%% COUNT NUMBER OF VOXELS FOR SUB = 1:2:LENGTH(ROINAMES);
+for sub = 1:2:length(roiNames);
+    singleTrials = cat(2, allBetasCombinedFiltered{sub}{1:length(task{1}.stimNames)});
+    if size(singleTrials,1) > 2
+        %save the number of voxels you have
+        numUsableVoxelsByROI(sub) = size(singleTrials,1);
+    end
+end
+
+%make roisToCombine
+roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > nVoxelsNeeded); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
+singleTrialCorrs = {};
+
+%go through each ROI, plot the average RSM for INDIVIDUAL presentations of the same stimuli
+%this should be read as how consistent the ROI is
+figure
+
+for roi = roisToCombine;
+    singleTrialCorrelations = zeros(numStimRepeats);
+    for stim = 1:length(task{1}.stimNames);
+        singleTrialCorrelations = singleTrialCorrelations + corr(allBetasCombinedFiltered{roi}{stim})/length(task{1}.stimNames);
+        singleTrialCorrs{roi}{stim} = corr(allBetasCombinedFiltered{roi}{stim});
+    end
+
+    subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)), hold on
+    imagesc(singleTrialCorrelations),
+    colorbar, caxis([-.2 .2])
+    title(roiNames(roi))
+end
+ 
+sgtitle('Reliability by area (individual trial correlations, averaged over all stimuli)')
+
+
+% plot reliability of different patterns of stimuli
+%stimNames = task{1}.stimfile.stimulus.objNames;
+
+figure, hold on
+colors = cool(numBetasEachScan/2);
+for stim = 1:length(task{1}.stimNames)
+    y = [];
+    %subplot(4,ceil(length(stimNames)/4),stim), hold on
+
+    for roi = 1:length(roisToCombine);
+        stimSingleTrialCorrs = singleTrialCorrs{roisToCombine(roi)}{stim};
+        %scatter(roi, median(stimSingleTrialCorrs(stimSingleTrialCorrs<1)));
+        y = [y median(stimSingleTrialCorrs(stimSingleTrialCorrs<1))];
+    end
+
+    scatter(1:length(roisToCombine), y, 100, 'MarkerFaceColor', colors(stim,:), 'MarkerEdgeColor', 'w');
+
+
+end
+
+hline(0)
+xticks(1:length(roisToCombine)); xticklabels(roiNames(roisToCombine));
+title('Median single-trial correlation by area (by stimulus)');
+%legend(stimNames);
+
 %%
+
+
+
 
 
 
