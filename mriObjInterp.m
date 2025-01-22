@@ -23,39 +23,31 @@ function mriObjInterp(varargin)
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
-getArgs(varargin, {'reliabilityCutoff=.30', 'r2cutoff=0', 'shuffleData=0', 'zscorebetas=1', 'numBoots=100', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
-    'numBetasEachScan=48', 'numScansInGLM=15', 'numStimRepeats=30','truncateTrials=(10/10)', 'clean=1', 'comebineData=0'});
+getArgs(varargin, {'reliabilityCutoff=0.3', 'r2cutoff=0', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+    'truncateTrials=(10/10)', 'clean=1', 'comebineData=0'});
 
 
 %% LOAD AND PROCESS THE DATA
 
 % Task 1 is right visual field  so LEFT HEMISPHERE rois should be responsive
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE rois shold be responsive
-%load the data
 
-%uncomment for subject s0603
-dataPath = ('~/data/interp/s0603/betaFiles'); fileNames{1} = 's0603Task1BigROIs.mat'; fileNames{2} = 's0603Task2BigROIs.mat'; bigRois = 1;
+%list the subjects you want. right now, you have to use the big rois from combineGlasserRois -> createBigRoi if you want to combine. might add more options later but atm seems like a pain in the ass for little return.
+subNumbers = {'s0605'};
 
-%uncomment for subject s0604
-%dataPath = ('~/data/interp/s0604/betaFiles'); fileNames{1} = 's0604Task1BigROIs.mat'; fileNames{2} = 's0604Task2BigROIs.mat'; bigROIs = 1;
-
-
-% run the command
-[task, allBetasCombinedFiltered, roiNames] =... 
-    processData(reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, ...
-    numBetasEachScan, numScansInGLM, numStimRepeats, truncateTrials, dataPath, fileNames);
-
-%put the data here for now. In the future I will update this so you can combine multiple runs by iterating through the data object.
-data{1} = allBetasCombinedFiltered;
-
-
+%load each of the subjects data. You are getting a subject -> roi -> stimulus -> trial structure for each.
+for sub = 1:length(subNumbers)
+    %get paths for that subject
+    dataPath = (strcat('~/data/interp/', subNumbers{sub}, '/betaFiles')); fileNames{1} = strcat(subNumbers{sub}, 'Task1BigROIs.mat'); fileNames{2} = strcat(subNumbers{sub}, 'Task2BigROIs.mat'); bigRois = 1;
+    %get the data. The task and everything else should be the same.
+    [task, data{sub}, roiNames, numBetasEachScan, numScansInGLM, numStimRepeats, numUsableVoxels] =... 
+    processData(reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, truncateTrials, dataPath, fileNames);
+end
 
 
 %% COMBINE THE DATA
-
-%if there is only 1 subject, you are combining it with itself.
+%if there is only 1 subject, you are combining it with itself. It needs to do this step to put the data in the right format.
 allBetasCombinedFiltered = combineData(data);
-
 
 
 %% MAKE DIFFERENT LARGE ROIS (EARLY, MIDDLE, VENTRAL) AND ALSO MAKE AVERAGED VERSIONS
@@ -139,70 +131,63 @@ title('RSM: Ventral voxels. Correlation between averaged patterns of activity')
 figure
 ParietalRSM = calculateRSM(allBetasParietalROI, stimNames);
 title('RSM: Parietal voxels. Correlation between averaged patterns of activity')
+if clean, close, end
 
 
 
 %% DO MLDS IN DIFFERENT REGIONS
+if ~clean
 
 %do EVC
 figure
-doMLDS(allBetasEVCROIAveraged, mldsReps, colors, task, interpSets, 0)
+doMLDS(allBetasEVCROIAveraged, mldsReps, colors, task, interpSets, 0, 1)
 sgtitle('EVC mlds')
-if clean, close, end
 
 %do MVC
 figure
-doMLDS(allBetasMVCROIAveraged, mldsReps, colors, task, interpSets, 0)
+doMLDS(allBetasMVCROIAveraged, mldsReps, colors, task, interpSets, 0, 1)
 sgtitle('Mid-level cortex Mlds')
-if clean, close, end
 
 %do ventral ROIs
 figure
-doMLDS(allBetasVVSROIAveraged, mldsReps, colors, task, interpSets, 0)
+doMLDS(allBetasVVSROIAveraged, mldsReps, colors, task, interpSets, 0, 1)
 sgtitle('VVS mlds')
-if clean, close, end
 
 %do parietal ROI
 figure
-doMLDS(allBetasParietalROIAveraged, mldsReps, colors, task, interpSets, 0)
+doMLDS(allBetasParietalROIAveraged, mldsReps, colors, task, interpSets, 0, 1)
 sgtitle('Parietal mlds')
-if clean, close, end
 
 %do big ROI
 figure
-doMLDS(allBetasBigROIAveraged, mldsReps, colors, task, interpSets, 0)
+doMLDS(allBetasBigROIAveraged, mldsReps, colors, task, interpSets, 0, 1)
 sgtitle('All voxels mlds')
-if clean, close, end
 
-
+end
 %% 2-WAY CLASSIFICATION BETWEEN INTERPOLATION SETS
-
+if ~clean
 %classify EVC
 figure
 doClassification(allBetasEVCROI, colors, task, numStimRepeats, interpSets)
 sgtitle('Classification: EVC')
-if clean, close, end
 
 %classify MVC
 figure
 doClassification(allBetasMVCROI, colors, task, numStimRepeats, interpSets)
 sgtitle('Classification: MVC')
-if clean, close, end
 
 
 %classify VVS
 figure
 doClassification(allBetasVVSROI, colors, task, numStimRepeats, interpSets)
 sgtitle('Classification: VVC')
-if clean, close, end
 
 %classify Parietal
 figure
 doClassification(allBetasParietalROI, colors, task, numStimRepeats, interpSets)
 sgtitle('Classification: Parietal')
-if clean, close, end
 
-
+end
 
 %% AVERAGE THE RSMS OF THE INDIVIDUAL INTERPOLATIONS TOGETHER AND PLOT FOR EACH AREA
 
@@ -234,46 +219,119 @@ sgtitle('RSMs, averaged (post-normalization) over all interpolated stimulus sets
 %parietal
 figure, imagesc(ParietalRSMAveraged), colormap(hot), colorbar, caxis([0 1])
 title('RSM: Parietal voxels'), xlabel('Object number'), ylabel('Interpolation number')
+if clean, close, end
 
 
 
 %% DO MLDS ON THE AVERAGED RSMs AND PLOT IT:
 
 figure, subplot(1,4,1), hold on
-doMLDS(EVCRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
+doMLDS(EVCRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1, 0)
 title('Early visual cortex')
 
 subplot(1,4,2), hold on
-doMLDS(MVCRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
+doMLDS(MVCRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1, 0)
 title('Mid-level visual cortex')
 
 subplot(1,4,3), hold on
-doMLDS(VVSRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
+doMLDS(VVSRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1, 0)
 title('Ventral visual cortex')
 
 subplot(1,4,4), hold on
-doMLDS(BigROIRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
+doMLDS(BigROIRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1, 0)
 title('Entire cortex')
 
 sgtitle('MLDS for averaged interpolations in different areas')
 
 %do parietal
 figure, hold on
-doMLDS(ParietalRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1)
+doMLDS(ParietalRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1, 0)
 title('Parietal RSM)')
+if clean, close, end
+
+
+
+%% PLOT EVIDENCE FOR CATEGORICAL VS LINEAR RSMS
+
+figure, hold on
+inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged BigROIRSMAveraged};
+compareCatRSM(inputRSMs)
+
+
+
 
 
 
 %% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%%
 
 
+
+%%
+
 keyboard
 
 
+%%
+
+
+ 
 
 
 
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% compareCatRSM
+%%%%%%%%%%%%%%%%%%%%%%
+function compareCatRSM(inputRSMs)
+
+% create the 2 null hypothesis matrices
+categoricalRSM = [ones(3) zeros(3); zeros(3) ones(3)];
+linearRSM = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
+
+for inputNum = 1:length(inputRSMs)
+
+    %get the RSM and normalize the input RSM to be between 0 and 1
+    inputRSM = inputRSMs{inputNum};
+    normalizedInputRSM = (inputRSM - min(inputRSM(:))) / (max(inputRSM(:)) - min(inputRSM(:)));
+    
+    % compute differences between null hypotheses
+    categoricalDifference = categoricalRSM - normalizedInputRSM;
+    
+    %zero out diagonal
+    categoricalDifference(logical(eye(size(categoricalDifference)))) = 0;
+    
+    %sum the absolute values, getting rid of diagonal
+    categoricalDifference = sum(sum(abs(categoricalDifference)));
+
+    %bootstrap randomized version of the matrix
+    nullCategoricalDifferences = [];
+    for boot = 1:100;
+        nullCategoricalDifference = categoricalRSM - reshape(normalizedInputRSM(randperm(numel(normalizedInputRSM))), size(normalizedInputRSM));
+        nullCategoricalDifference(logical(eye(size(nullCategoricalDifference)))) = 0;
+        nullCategoricalDifferences = [nullCategoricalDifferences (sum(sum(abs(nullCategoricalDifference))))];
+    end
+    nullCategoricalDifference = mean(nullCategoricalDifferences);
+
+    %plot how far off it is from the categorical matrix
+    scatter(inputNum, categoricalDifference, 'k','filled'),
+    scatter(inputNum, nullCategoricalDifference, 'r', 'filled')
+
+end
+
+%compute and plot linear interpolation null hypothesis like you did before
+linearDifference = categoricalRSM - linearRSM;
+linearDifference(logical(eye(size(linearDifference)))) = 0;
+linearDifference = sum(sum(abs(linearDifference)));
+
+%plot and label things
+plot([1 inputNum], [linearDifference linearDifference]);
+legendEntries = repmat({''}, 1, length(inputRSMs)*2+1);
+legendEntries([1, 2, end]) = {'Calculated difference', 'Shuffled difference', 'Linear null hypothesis'}; % Assign specific entries
+legend(legendEntries)
+xlim([0.5 4.5]), ylim([4 16])
+xticks(1:inputNum), xticklabels({'EVC', 'MVC', 'VVS', 'allROIs'})
+ylabel('Deviation from categorical RSM (summed differences)')
 
 
 %%%%%%%%%%%%%%%%%%
@@ -387,7 +445,7 @@ catRSM = cat(3, rsm(interpSets{1},interpSets{1}), rsm(interpSets{2},interpSets{2
 %min/max normalization
 minVal = min(catRSM, [], [1 2]); % Minimum value across each matrix
 maxVal = max(catRSM, [], [1 2]); % Maximum value across each matrix
-normalizedRSM = (catRSM - minVal) ./ (maxVal - minVal + eps); % Add eps to avoid division by zero
+normalizedRSM = (catRSM - minVal) ./ (maxVal - minVal); % 
 
 
 %average
@@ -397,9 +455,9 @@ averagedRSM = mean(normalizedRSM, 3);
 
 
 
-%%%%%%%
+%%%%%%%%%%%%
 %% drawLines
-%%%%%%%%%
+%%%%%%%%%%%%
 function drawLines
     hold on
     plot([.5 24.5], [6.5 6.5], 'k'), plot([.5 24.5], [12.5 12.5], 'k'), plot([.5 24.5], [18.5 18.5], 'k')
@@ -407,7 +465,11 @@ function drawLines
 
 
 
-%% classification - train an SVM on the endpoints and see how it predicts the interpolations
+
+%%%%%%%%%%%%%%
+%% do classification
+%%%%%%%%%%%%%%%
+% classification - train an SVM on the endpoints and see how it predicts the interpolations
 function doClassification(classificationVoxels, colors, task, numStimRepeats, interpSets)
     for set = 1:length(interpSets)
         %define endpoints
@@ -442,9 +504,11 @@ function doClassification(classificationVoxels, colors, task, numStimRepeats, in
 
 
 
-
-%% do maximum likelihood distance scaling on the averaged representation with voxels from all ROIs
-function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSets, preComputeCorr)    
+%%%%%%%%%%%%%%%%%%%%%
+%% doMLDS %%%%%
+%%%%%%%%%%%%%%%%%%
+% do maximum likelihood distance scaling on the averaged representation with voxels from all ROIs
+function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSets, preComputeCorr, constrainBounds)    
     disp('Doing mlds...')
     %iterate through different interps
     for repititions = 1:mldsReps
@@ -472,8 +536,13 @@ function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSe
             %simulate n draws of 4 images
             numSamples = 1000;
             ims = randi(6,4,numSamples);
+
+            %take out repeat stimuli (e.g. 2,2 vs 1,4 // 2,4 vs 5,5) if you want
+            for j  = numSamples:-1:1, if ims(1,j) == ims(2,j) | ims(3,j) == ims(4,j), ims(:,j) = []; end, end
+            sprintf('Taking out mlds repeats - empirically didnt make a difference, but maybe check later if you are having trouble fitting...')
+
             responses = [];
-            for trial = 1:numSamples
+            for trial = 1:size(ims,2)
                 responses(trial) = corMatrix(ims(1,trial), ims(2,trial)) < corMatrix(ims(3,trial), ims(4,trial));
                 j = ims(1,trial); k = ims(2,trial); l = ims(3,trial); m = ims(4,trial);
                 if j == k | l == m | isequal(sort([j k]), sort([l m]));
@@ -481,22 +550,34 @@ function [allPsi allSigma] = doMLDS(mldsVoxels, mldsReps, colors, task, interpSe
                 end
             end
     
-            % set up initial params
-            %psi = [0.5 0.5 0.5 0.5];
-            psi = [.2 .4 .6 .8];
-            sigma = .2;
+           % Set initial parameters
+            psi = [0.2 0.4 0.6 0.8];
+            sigma = 0.2;
             initialParams = [psi, sigma];
             
-            %options
-            options = optimset('fminsearch'); options.MaxFunEvals = 20000; options.MaxIter = 20000; options.Display = 'off';
-            %options.TolFun = .0001;
+            % define bounds - there is a flag to constrain psis to 0-1 with the endpoints preset as 0 1
+            if constrainBounds,
+                lb = [0, 0, 0, 0, 0]; % Lower bounds for psi and sigma
+                ub = [1, 1, 1, 1, 2]; % Upper bounds for psi and sigma
+            else
+                lb = [-inf, -inf, -inf, -inf, 0]; % Lower bounds for psi and sigma
+                ub = [inf, inf, inf, inf, inf]; % Upper bounds for psi and sigma
+            end
+
+            % Options for fmincon
+            options = optimoptions('fmincon', 'MaxIterations', 20000);
             
-            %search for params
-            optimalParams = fminsearch(@(params) computeLoss(params, ims, responses), initialParams, options);
-            psi = [0 optimalParams(1:4) 1];
-            psi = (psi-min(psi));
-            psi = psi/max(psi);
+            % Define objective function
+            objective = @(params) computeLoss(params, ims, responses);
             
+            % Optimize using fmincon
+            optimalParams = fmincon(objective, initialParams, [], [], [], [], lb, ub, [], options);
+            
+            % Normalize psi
+            psi = [0, optimalParams(1:4), 1];
+            psi = (psi - min(psi));
+            psi = psi / max(psi);
+                        
             %plot
             if length(interpSets) > 1, subplot(1,4,set), hold on, end
             scatter(1:6,psi, 'filled', 'MarkerFaceColor', colors(max(interpSets{set}),:))
@@ -562,20 +643,34 @@ function totalProb = computeLoss(params, ims, responses)
 
 
 
-
-
 %%%%%%%%%%%%%%%%%%
 %% processData
 %%%%%%%%%%%%%%%%%%
-function [task, allBetasCombinedFiltered, roiNames] = processData(...
+function [task, allBetasCombinedFiltered, roiNames, numBetasEachScan, numScansInGLM, numStimRepeats, numUsableVoxelsByROI] = processData(...
     reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, ...
-    numBetasEachScan, numScansInGLM, numStimRepeats, truncateTrials, dataPath, fileNames);
+    truncateTrials, dataPath, fileNames);
 
 
 %load the data
 cd(dataPath);
 task{1} = load(fileNames{1});
-task{2} = load(fileNames{2});
+
+% little trick here - if you did foveal stimuli, duplicate the task. Then, later we will combine left and right hemi rois for the SAME task - so you
+% are getting all the voxels you want anyway. This will make contra and ipso duplicates of eachother - which is ok, because we toss ipso later.
+% if periphery (both sides), just load the other task (other side).
+if ~isfield(task{1}, 'foveal'), task{1}.foveal = 0, end
+
+if ~task{1}.foveal;
+    task{2} = load(fileNames{2});
+else
+    task{2} = task{1};
+end
+
+% get parameters you need about the glm
+numBetasEachScan = task{1}.numBetasEachScan;
+numScansInGLM = task{1}.numScansInGLM;
+numStimRepeats = task{1}.numStimRepeats;
+
 
 %fix the stim names thing - remove the duplicate of the blanks (in this case, 1 8 15 22
 for taskNum = 1:2,
@@ -595,7 +690,7 @@ for roi = 1:length(roiNames)
         string = strcat('contra ', roiNames{roi}(2:end));
         roiNames{roi} = strrep(string,'_',' ');
     else
-        string = strcat('ipso ', roiNames{roi}(2:end));
+        string = strcat('ipsi ', roiNames{roi}(2:end));
         roiNames{roi} = strrep(string,'_',' ');
     end
 end
@@ -644,6 +739,7 @@ for taskNum = 1:2;
         split2_amps = {};
         %
         for cond = 1:length(task{taskNum}.stimNames);
+        %for cond = [1 6 7 12 13 18 19 24]; % if you want, could only include voxels that are stable for just the endpoint objects...
             condition_amps{cond} = task{taskNum}.betas(:,task{taskNum}.trial_conditions==cond);
             nTrials = size(condition_amps{cond},2);
             
@@ -825,49 +921,19 @@ title('Median single-trial correlation by area (by stimulus)');
 function allBetasCombinedFiltered = combineData(data);
 
 %get first subjects all betas combined filtered
-allBetasCombinedFiltered = data{1}
+allBetasCombinedFiltered = data{1};
 
 %go through addition subjects, if any
 for subject = 2:length(data)
     for roi = 1:length(data{subject})
         for stimulus = 1:length(data{subject}{roi})
-            allBetasCombinedFiltered{roi}{stimulu} = [allBetasCombinedFiltered{roi}{stimulus}; data{subject}{roi}{stimulus}];
+            allBetasCombinedFiltered{roi}{stimulus} = [allBetasCombinedFiltered{roi}{stimulus}; data{subject}{roi}{stimulus}];
         end
     end
 end
 
 
 
-
-
-
-
-
-
-% %% look at the reliability of the patterns for single trials in different areas
-% figure,
-% 
-% %make roisToCombine
-% roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > nVoxelsNeeded); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
-% singleTrialCorrs = {};
-% 
-% %go through each ROI, plot the average RSM for INDIVIDUAL presentations of the same stimuli
-% %this should be read as how consistent the ROI is
-% for roi = roisToCombine;
-%     singleTrialCorrelations = zeros(30);
-%     for stim = 1:length(task{1}.stimNames);
-%         singleTrialCorrelations = singleTrialCorrelations + corr(allBetasCombinedFiltered{roi}{stim})/length(task{1}.stimNames);
-%         singleTrialCorrs{roi}{stim} = corr(allBetasCombinedFiltered{roi}{stim});
-%     end
-% 
-%     subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)), hold on
-%     imagesc(singleTrialCorrelations),
-%     colorbar, caxis([-.2 .2])
-%     title(roiNames(roi))
-% end
-% 
-% sgtitle('Reliability by area (individual trial correlations, averaged over all stimuli)')
-% %%
 
 
 
@@ -896,122 +962,82 @@ end
 
 
 
-% %% classification in individual ROIs - train an SVM on the n-way classification task (number of stimuli types)
+% %% do mlds on UNAVERAGED representations
 % figure
-% for roi = roisToCombine
-%     %create data and labels
-%     data = cell2mat(allBetasCombinedFiltered{roi})';
-%     labels = repelem(1:length(stimNames), numStimRepeats);
-%     [data, labels] = shuffleDataLabelOrder(data, labels);
-%     %fit sv 
-%     numFolds = 5;
-%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-%     % eval
-%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
-%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
-%     predictions = kfoldPredict(svm);
-%     %plot confusion
-%     subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)),
-%     confusionchart(labels, predictions, 'Normalization', 'column-normalized')
-%     title(roiNames(roi))
-% end
 % 
+% disp('Doing mlds - takes a minute or so.')
+% %iterate through different interps
+% for repititions = 1:mldsReps
 % 
+%     %get single trial correlations
+%     for set = 1:length(interpSets)      
+%         corMatrix = [];
+%         for interp = interpSets{set}
+%             for interp2 = interpSets{set}
+%                 allCors = corr(allBetasBigROI{interp}, allBetasBigROI{interp2});
+%                 corMatrix(interp,interp2,:) = allCors(tril(allCors,-1) ~= 0);
+%             end
+%         end
+%         %simulate n draws of 4 images
+%         numSamples = 5000;
+%         ims = randi(6,4,numSamples);
+%         %calculate which pair has a higher correlation
+%         responses = [];
+%         for trial = 1:numSamples
+%             responses(trial) = corMatrix(ims(1,trial), ims(2,trial), randi(size(corMatrix,3))) < corMatrix(ims(3,trial), ims(4,trial), randi(size(corMatrix,3)));
+%             j = ims(1,trial); k = ims(2,trial); l = ims(3,trial); m = ims(4,trial);
+%             if j == k | l == m | isequal(sort([j k]), sort([l m]));
+%                 responses(trial) = 2;
+%             end
+%         end
 % 
+%        % Set initial parameters
+%             psi = [0.2 0.4 0.6 0.8];
+%             sigma = 0.2;
+%             initialParams = [psi, sigma];
+%             
+%             % define bounds - there is a flag to constrain psis to 0-1 with the endpoints preset as 0 1
+%             if constrainBounds,
+%                 lb = [0, 0, 0, 0, 0]; % Lower bounds for psi and sigma
+%                 ub = [1, 1, 1, 1, 2]; % Upper bounds for psi and sigma
+%             else
+%                 lb = [-inf, -inf, -inf, -inf, 0]; % Lower bounds for psi and sigma
+%                 ub = [inf, inf, inf, inf, inf]; % Upper bounds for psi and sigma
+%             end
 % 
-
-
-% %% n-way (all stimuli) classification on the different ROIs (all, early, middle, late)
-% 
-% % classification on big roi
-%     figure, subplot(2,2,1)
-%     %create data and labels
-%     data = cell2mat(allBetasBigROI)';
-%     labels = repelem(1:length(stimNames), numStimRepeats);
-%     [data, labels] = shuffleDataLabelOrder(data, labels);
-%     %fit svm
-%     numFolds = 5;
-%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-%     % eval
-%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
-%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
-%     predictions = kfoldPredict(svm);
-%     allROIsConfusionChart = confusionchart(labels, predictions, 'Normalization', 'column-normalized');
-%     title(sprintf('All ROIs confusion chart: %0.2f accuracy', 1-cvLoss))
+%             % Options for fmincon
+%             options = optimoptions('fmincon', 'MaxIterations', 20000);
+%             
+%             % Define objective function
+%             objective = @(params) computeLoss(params, ims, responses);
+%             
+%             % Optimize using fmincon
+%             optimalParams = fmincon(objective, initialParams, [], [], [], [], lb, ub, [], options);
+%         
+%             % Normalize psi
+%             psi = [0, optimalParams(1:4), 1];
+%             psi = (psi - min(psi));
+%             psi = psi / max(psi);
+%             
+%         %plot
+%         subplot(1,4,set), hold on
+%         scatter(1:6,psi, 'filled')
+%         gaussFit = fitCumulativeGaussian(1:6, psi);
+%         PSE = gaussFit.mean;
+%         PSEs{set}(repititions) = PSE;
+%         plot(gaussFit.fitX,gaussFit.fitY)
+%         scatter(gaussFit.mean,.5,50,'MarkerFaceColor','r','MarkerEdgeColor','w')
+%         plot([1 6], [0 1],'k','lineStyle','--')
 %     
-%     RSMconfusionCorr = corr(RSM(RSM<1),allROIsConfusionChart.NormalizedValues(RSM<1));
-%     sprintf('Correlation between confusion chart and RSM: %0.3f', RSMconfusionCorr)
-% 
-% 
-% % classification on EVC roi
-%     subplot(2,2,2)
-%     %create data and labels
-%     data = cell2mat(allBetasEVCROI)';
-%     labels = repelem(1:length(stimNames), numStimRepeats);
-%     [data, labels] = shuffleDataLabelOrder(data, labels);
-%     %fit svm
-%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-%     % eval
-%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
-%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
-%     predictions = kfoldPredict(svm);
-%     confusionchart(labels, predictions, 'Normalization', 'column-normalized')
-%     title(sprintf('Early visual confusion chart: %0.2f accuracy', 1-cvLoss))
-% 
-% 
-% % classification on MVC roi
-%     subplot(2,2,3)
-%     %create data and labels
-%     data = cell2mat(allBetasMVCROI)';
-%     labels = repelem(1:length(stimNames), numStimRepeats);
-%     [data, labels] = shuffleDataLabelOrder(data, labels);
-%     %fit svm
-%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-%     % eval
-%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
-%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
-%     predictions = kfoldPredict(svm);
-%     confusionchart(labels, predictions, 'Normalization', 'column-normalized')
-%     title(sprintf('Mid-level visual confusion chart: %0.2f accuracy', 1-cvLoss))
-% 
-% 
-% % classification on VVS roi
-%     subplot(2,2,4)
-%     %create data and labels
-%     data = cell2mat(allBetasVVSROI)';
-%     labels = repelem(1:length(stimNames), numStimRepeats);
-%     [data, labels] = shuffleDataLabelOrder(data, labels);
-%     %fit svm
-%     svm = fitcecoc(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
-%     % eval
-%     cvLoss = kfoldLoss(svm); % Cross-validated classification error
-%     disp(['Cross-validated loss: ', num2str(cvLoss)]);
-%     predictions = kfoldPredict(svm);
-%     confusionchart(labels, predictions, 'Normalization', 'column-normalized')
-%     title(sprintf('VVS confusion chart: %0.2f accuracy', 1-cvLoss))
-
-
-
-% %% look at the reliability of the patterns for single trials in different areas
-% figure,
-% 
-% %make roisToCombine
-% roisToCombine = 1:length(task{1}.roiNames); roisToCombine = roisToCombine(numUsableVoxelsByROI > nVoxelsNeeded); roisToCombine = roisToCombine(mod(roisToCombine,2)==1);
-% singleTrialCorrs = {};
-% 
-% %go through each ROI, plot the average RSM for INDIVIDUAL presentations of the same stimuli
-% %this should be read as how consistent the ROI is
-% for roi = roisToCombine;
-%     singleTrialCorrelations = zeros(numStimRepeats);
-%     for stim = 1:length(task{1}.stimNames);
-%         singleTrialCorrelations = singleTrialCorrelations + corr(allBetasCombinedFiltered{roi}{stim})/length(task{1}.stimNames);
-%         singleTrialCorrs{roi}{stim} = corr(allBetasCombinedFiltered{roi}{stim});
+%         %limits and label
+%         ylim([-0.05, 1.05]);
+%         xlim([1 6]);
+%         xlabel('Synthesized interpolation value')
+%         ylabel('Neural interpolation value')
+%         if set == 1; title('Grass to leaves mlds'); elseif set == 2, title('Lemons to bananas mlds'), end
+%     
 %     end
-% 
-%     subplot(4,ceil(length(roisToCombine)/4),find(roisToCombine == roi)), hold on
-%     imagesc(singleTrialCorrelations),
-%     colorbar, caxis([-.2 .2])
-%     title(roiNames(roi))
 % end
-% 
-% sgtitle('Reliability by area (individual trial correlations, averaged over all stimuli)')
+% sgtitle(sprintf('MLDS, all %i voxels in all ROIs', sum(numUsableVoxelsByROI)))
+
+
