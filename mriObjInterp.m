@@ -23,8 +23,8 @@ function mriObjInterp(varargin)
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
-getArgs(varargin, {'reliabilityCutoff=0.3', 'r2cutoff=0', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
-    'truncateTrials=(10/10)', 'clean=1', 'comebineData=0'});
+getArgs(varargin, {'reliabilityCutoff=0.4', 'r2cutoff=0', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+    'truncateTrials=(8/10)', 'clean=1', 'comebineData=0'});
 
 
 %% LOAD AND PROCESS THE DATA
@@ -252,10 +252,19 @@ if clean, close, end
 
 
 %% PLOT EVIDENCE FOR CATEGORICAL VS LINEAR RSMS
-
 figure, hold on
 inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged BigROIRSMAveraged};
 compareCatRSM(inputRSMs)
+
+
+
+%% Do MDS, PCA on the averaged RSMs
+figure
+inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged BigROIRSMAveraged};
+doMDSPCA(inputRSMs,2)
+
+
+
 
 
 
@@ -265,13 +274,62 @@ compareCatRSM(inputRSMs)
 %% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%%
 
 
-
-%%
-
 keyboard
 
 
-%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% do MDS and PCA 
+%%%%%%%%%%%%%%%%%%%%%%
+
+function doMDSPCA(inputRSMs,numDimensions)
+
+for inputNum = 1:length(inputRSMs)
+    inputRSM = inputRSMs{inputNum}; num = inputNum-1;
+    
+    %make colors to plot
+    colors = [repmat([1 0 0], 3, 1); %red
+              repmat([0 0 0], 3, 1)]; %black
+    
+    %% do MDS first
+    % create DSM and zero out diag (it's not 0 because you normalized and averaged earlier)
+    dissimilarityMatrix = 1 - inputRSM;
+    for i = 1:size(dissimilarityMatrix, 1), dissimilarityMatrix(i, i) = 0; end
+    
+    %set options
+    MDSopts = statset('MaxIter', 10000, 'TolFun', 1e-6); % Increase iterations and tolerance
+    
+    % fit the MDS
+    [Y, stress] = mdscale(dissimilarityMatrix, numDimensions, 'Options', MDSopts);
+    
+    % show it
+    subplot(length(inputRSMs), 15, [1:6] + num*15), hold on, xlim([-1 1]), ylim([-1 1])
+    scatter(Y(:,1), Y(:,2), 50, colors, 'filled')
+    text(Y(:,1), Y(:,2), string(1:size(Y,1)), 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
+    title('MDS Embedding'), xlabel('Dimension 1'), ylabel('Dimension 2')
+    
+    
+    %% now do PCA
+    similarityMatrix = inputRSM;
+    
+    % perform PCA
+    [coeff, score, latent] = pca(similarityMatrix);
+    
+    % plot the first principal component
+    subplot(length(inputRSMs), 15, [8:13] + num*15);
+    scatter(score(:,1), zeros(size(score,1),1), 50, colors, 'filled'); % 1D PCA
+    text(score(:,1), zeros(size(score,1),1), string(1:size(score,1)), 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
+    xlim([-1 1]);
+    
+    %label
+    title('PCA embedding'); xlabel('First Principal Component');
+    
+    %plot the egeinvalues
+    subplot(length(inputRSMs), 15, [14:15] + num*15)
+    scatter(1:length(latent),latent, 'filled','k')
+    xlabel('PCA Eigenvector'), ylabel('Eigenvalue')
+    
+end
 
 
  
@@ -332,6 +390,8 @@ legend(legendEntries)
 xlim([0.5 4.5]), ylim([4 16])
 xticks(1:inputNum), xticklabels({'EVC', 'MVC', 'VVS', 'allROIs'})
 ylabel('Deviation from categorical RSM (summed differences)')
+
+
 
 
 %%%%%%%%%%%%%%%%%%
