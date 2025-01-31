@@ -17,14 +17,11 @@ function mriObjInterp(varargin)
 %    mldsReps: number of mlds bootstraps. if set above 1, when averaging each condition, will average a random subset of trials instead of all
 %    plotBig: plots things in their own graphs rather than as subplots
 %    doROImlds: flag for if you want to do mlds in each ROI. takes a while to do this, so set to 0 to save time
-%    numBetasEachScan: Used for zscoring. Should be the number of betas you get from each scan from glmSingle (e.g. 12 conds x 4 repeats = 48)
-%    numScansInGLM: Used for zscoring. Needed to zscore over individual scans.
-%    numStimRepeats: Number of repeats of each stimulus (how many times shown in scanner)
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
-getArgs(varargin, {'reliabilityCutoff=0.4', 'r2cutoff=0', 'shuffleData=0', 'zscorebetas=1', 'numBoots=1000', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
-    'truncateTrials=(8/10)', 'clean=1', 'comebineData=0'});
+getArgs(varargin, {'reliabilityCutoff=150', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+    'truncateTrials=(10/10)', 'clean=1'});
 
 
 %% LOAD AND PROCESS THE DATA
@@ -43,7 +40,6 @@ for sub = 1:length(subNumbers)
     [task, data{sub}, roiNames, numBetasEachScan, numScansInGLM, numStimRepeats, numUsableVoxels] =... 
     processData(reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, truncateTrials, dataPath, fileNames);
 end
-
 
 %% COMBINE THE DATA
 %if there is only 1 subject, you are combining it with itself. It needs to do this step to put the data in the right format.
@@ -109,27 +105,27 @@ plotROIReliability(allBetasVVSROI, numStimRepeats, stimNames)
 
 % RSM of the big ROI, combining all the small ROIS
 figure, subplot(2,2,1)
-BigROIRSM = calculateRSM(allBetasBigROI, stimNames);
+BigROIRSM = calculateRSM(allBetasBigROI, stimNames, numStimRepeats);
 title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
 
 % RSM of the EVC ROI
 subplot(2,2,2)
-EVCRSM = calculateRSM(allBetasEVCROI, stimNames);
+EVCRSM = calculateRSM(allBetasEVCROI, stimNames, numStimRepeats);
 title('RSM: EVC voxels. Correlation between averaged patterns of activity')
 
 % RSM of the mid ROI
 subplot(2,2,3)
-MVCRSM = calculateRSM(allBetasMVCROI, stimNames);
+MVCRSM = calculateRSM(allBetasMVCROI, stimNames, numStimRepeats);
 title('RSM: Mid-ventral voxels. Correlation between averaged patterns of activity')
 
 % RSM of the VVC ROI
 subplot(2,2,4),
-VVSRSM = calculateRSM(allBetasVVSROI, stimNames);
+VVSRSM = calculateRSM(allBetasVVSROI, stimNames, numStimRepeats);
 title('RSM: Ventral voxels. Correlation between averaged patterns of activity')
 
 % RSM of the Parietal ROI
 figure
-ParietalRSM = calculateRSM(allBetasParietalROI, stimNames);
+ParietalRSM = calculateRSM(allBetasParietalROI, stimNames, numStimRepeats);
 title('RSM: Parietal voxels. Correlation between averaged patterns of activity')
 if clean, close, end
 
@@ -251,27 +247,89 @@ if clean, close, end
 
 
 
+
+%% LOAD IN AND PROCESS NEURAL NETWORK DATA
+% right now, ran on v1net.
+NNdata = load('NNcorrMatrices.mat');
+NNEVCRSM = (NNdata.layer_0 + NNdata.layer_1)/2; %V1 and V2 in the model
+NNMVCRSM = NNdata.layer_2; % V4 in the model
+NNVVSRSM = NNdata.layer_3; % IT in the model
+NNChoiceRSM = NNdata.layer_4; % 1000 way classification vector
+
+NNEVCRSMAveraged = averageRSM(NNEVCRSM, interpSets);
+NNMVCRSMAveraged = averageRSM(NNMVCRSM, interpSets);
+NNVVSRSMAveraged = averageRSM(NNVVSRSM, interpSets);
+NNChoiceRSMAveraged = averageRSM(NNChoiceRSM, interpSets)
+
+%plot the averaged
+figure
+
+subplot(2,2,1), imagesc(NNChoiceRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+title('RSM: Classification layer'), xlabel('Interpolation number'), ylabel('Interpolation number')
+
+subplot(2,2,2), imagesc(NNEVCRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+title('RSM: V1/V2 layers'), xlabel('Interpolation number'), ylabel('Interpolation number')
+
+subplot(2,2,3), imagesc(NNMVCRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+title('RSM: V4 layer'), xlabel('Object number'), ylabel('Interpolation number')
+
+subplot(2,2,4), imagesc(NNVVSRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+title('RSM: IT layer'), xlabel('Object number'), ylabel('Interpolation number')
+
+sgtitle('NEURAL NETWORKS: RSMs, averaged (post-normalization) over all interpolated stimulus sets')
+
+
+%% Do MLDS on the NN representations
+figure, subplot(1,4,1), hold on
+doMLDS(NNEVCRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1, 0)
+title('V1/V2 layers')
+
+subplot(1,4,2), hold on
+doMLDS(NNMVCRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1, 0)
+title('V4 layer')
+
+subplot(1,4,3), hold on
+doMLDS(NNVVSRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1, 0)
+title('IT layer')
+
+subplot(1,4,4), hold on
+doMLDS(NNChoiceRSMAveraged, mldsReps, colors, task, {interpSets{1}}, 1, 0)
+title('Choice layer')
+
+sgtitle('NEURAL NETOWORK MLDS for averaged interpolations in different areas')
+
+if clean, close, end
+
+
 %% PLOT EVIDENCE FOR CATEGORICAL VS LINEAR RSMS
 figure, hold on
 inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged BigROIRSMAveraged};
-compareCatRSM(inputRSMs)
+compareCatRSM(inputRSMs, 0)
 
+figure, hold on
+NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged NNChoiceRSMAveraged};
+compareCatRSM(NNinputRSMs, 1)
+sgtitle("NEURAL NETWORK null category/linear matrix evidence")
 
 
 %% Do MDS, PCA on the averaged RSMs
-figure
+figure, hold on
 inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged BigROIRSMAveraged};
 doMDSPCA(inputRSMs,2)
 
-
-
-
-
-
+figure, hold on
+NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged};
+doMDSPCA(NNinputRSMs,2)
+if clean, close, end
 
 
 
 %% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%%
+
+
+
+
+
 
 
 keyboard
@@ -297,10 +355,10 @@ for inputNum = 1:length(inputRSMs)
     for i = 1:size(dissimilarityMatrix, 1), dissimilarityMatrix(i, i) = 0; end
     
     %set options
-    MDSopts = statset('MaxIter', 10000, 'TolFun', 1e-6); % Increase iterations and tolerance
+    MDSopts = statset('MaxIter', 100000, 'TolFun', 1e-6); % Increase iterations and tolerance
     
     % fit the MDS
-    [Y, stress] = mdscale(dissimilarityMatrix, numDimensions, 'Options', MDSopts);
+    [Y, stress] = mdscale(dissimilarityMatrix, numDimensions, 'Options', MDSopts); stress
     
     % show it
     subplot(length(inputRSMs), 15, [1:6] + num*15), hold on, xlim([-1 1]), ylim([-1 1])
@@ -316,9 +374,9 @@ for inputNum = 1:length(inputRSMs)
     [coeff, score, latent] = pca(similarityMatrix);
     
     % plot the first principal component
-    subplot(length(inputRSMs), 15, [8:13] + num*15);
-    scatter(score(:,1), zeros(size(score,1),1), 50, colors, 'filled'); % 1D PCA
-    text(score(:,1), zeros(size(score,1),1), string(1:size(score,1)), 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
+    subplot(length(inputRSMs), 15, [7:12] + num*15);
+    scatter(score(:,1), score(:,2), 50, colors, 'filled'); % 1D PCA
+    text(score(:,1), score(:,2), string(1:size(score,1)), 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right');
     xlim([-1 1]);
     
     %label
@@ -327,13 +385,9 @@ for inputNum = 1:length(inputRSMs)
     %plot the egeinvalues
     subplot(length(inputRSMs), 15, [14:15] + num*15)
     scatter(1:length(latent),latent, 'filled','k')
-    xlabel('PCA Eigenvector'), ylabel('Eigenvalue')
+    title('Scree'), xlabel('Eigenvector'), ylabel('Eigenvalue')
     
 end
-
-
- 
-
 
 
 
@@ -341,51 +395,64 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% compareCatRSM
 %%%%%%%%%%%%%%%%%%%%%%
-function compareCatRSM(inputRSMs)
+function compareCatRSM(inputRSMs,network)
 
 % create the 2 null hypothesis matrices
-categoricalRSM = [ones(3) zeros(3); zeros(3) ones(3)];
-linearRSM = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
+categoricalRSMCovar = [ones(3) zeros(3); zeros(3) ones(3)];
+linearRSMCovar = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
+linearDifference = 0;
 
 for inputNum = 1:length(inputRSMs)
-
-    %get the RSM and normalize the input RSM to be between 0 and 1
+    %figure(100), hold on
+    
+    %get the RSM and compute the idealized matrices based on measured variance
     inputRSM = inputRSMs{inputNum};
-    normalizedInputRSM = (inputRSM - min(inputRSM(:))) / (max(inputRSM(:)) - min(inputRSM(:)));
+    if ~network
+        inputVar = sqrt(diag(inputRSM));
+        varMatrix = inputVar*inputVar';
+        categoricalRSM = varMatrix .* linearRSMCovar;
+        linearRSM = varMatrix .* categoricalRSMCovar;
+    else
+        %neural networks have 1 along the diagonal - just normalize; don't do the variance adjustment.
+        inputRSM = (inputRSM - min(inputRSM(:))) / (max(inputRSM(:)) - min(inputRSM(:)));
+        categoricalRSM = categoricalRSMCovar;
+        linearRSM = linearRSMCovar;
+    end
     
     % compute differences between null hypotheses
-    categoricalDifference = categoricalRSM - normalizedInputRSM;
+    categoricalMatrixDifference = categoricalRSM - inputRSM;
+    linearMatrixDifference = linearRSM - inputRSM;
     
-    %zero out diagonal
-    categoricalDifference(logical(eye(size(categoricalDifference)))) = 0;
-    
-    %sum the absolute values, getting rid of diagonal
-    categoricalDifference = sum(sum(abs(categoricalDifference)));
+    %sum the absolute values
+    categoricalMatrixDifference = sum(sum(abs(categoricalMatrixDifference)));
+    linearMatrixDifference = sum(sum(abs(linearMatrixDifference)));
 
     %bootstrap randomized version of the matrix
-    nullCategoricalDifferences = [];
+    nullCategoricalMatrixDifferences = [];
     for boot = 1:100;
-        nullCategoricalDifference = categoricalRSM - reshape(normalizedInputRSM(randperm(numel(normalizedInputRSM))), size(normalizedInputRSM));
-        nullCategoricalDifference(logical(eye(size(nullCategoricalDifference)))) = 0;
-        nullCategoricalDifferences = [nullCategoricalDifferences (sum(sum(abs(nullCategoricalDifference))))];
+        nullCategoricalMatrixDifference = categoricalRSM - reshape(inputRSM(randperm(numel(inputRSM))), size(inputRSM));
+        %nullCategoricalMatrixDifference(logical(eye(size(nullCategoricalMatrixDifference)))) = 0;
+        nullCategoricalMatrixDifferences = [nullCategoricalMatrixDifferences (sum(sum(abs(nullCategoricalMatrixDifference))))];
     end
-    nullCategoricalDifference = mean(nullCategoricalDifferences);
+    nullCategoricalMatrixDifference = mean(nullCategoricalMatrixDifferences);
 
     %plot how far off it is from the categorical matrix
-    scatter(inputNum, categoricalDifference, 'k','filled'),
-    scatter(inputNum, nullCategoricalDifference, 'r', 'filled')
+    scatter(inputNum, categoricalMatrixDifference, 'b','filled'),
+    scatter(inputNum, linearMatrixDifference, 'cyan','filled'),
+    scatter(inputNum, nullCategoricalMatrixDifference, 'r', 'filled')
 
+    %add lienar difference
+    linearDifference = linearDifference + (categoricalRSM - linearRSM);
 end
 
 %compute and plot linear interpolation null hypothesis like you did before
-linearDifference = categoricalRSM - linearRSM;
-linearDifference(logical(eye(size(linearDifference)))) = 0;
+linearDifference = linearDifference/length(inputRSMs);
 linearDifference = sum(sum(abs(linearDifference)));
 
 %plot and label things
-plot([1 inputNum], [linearDifference linearDifference]);
-legendEntries = repmat({''}, 1, length(inputRSMs)*2+1);
-legendEntries([1, 2, end]) = {'Calculated difference', 'Shuffled difference', 'Linear null hypothesis'}; % Assign specific entries
+plot([1 inputNum], [linearDifference linearDifference], 'r');
+legendEntries = repmat({''}, 1, length(inputRSMs)*3+1);
+legendEntries([1, 2, 3, end]) = {'Categorical difference', 'Linear difference', 'Shuffled difference', 'Linear/Categorical difference'}; % Assign specific entries
 legend(legendEntries)
 xlim([0.5 4.5]), ylim([4 16])
 xticks(1:inputNum), xticklabels({'EVC', 'MVC', 'VVS', 'allROIs'})
@@ -401,7 +468,7 @@ ylabel('Deviation from categorical RSM (summed differences)')
 function [allBetasROI allBetasROIAveraged] = createUsableROIs(ROIs, allBetasCombinedFiltered, stimNames);
 
 %combine the listed ROIs
-for stim = 1:length(stimNames);
+for stim = 1:length(stimNames)
     allBetasROI{stim} = [];
     for roi = ROIs
         allBetasROI{stim} = [allBetasROI{stim}; allBetasCombinedFiltered{roi}{stim}];
@@ -420,25 +487,35 @@ end
 %%%%%%%%%%%%%
 %% Calculate RSMs %%
 %%%%%%%%%%%%%%%%%%%%
-function RSM = calculateRSM(voxels, stimNames)
-    %create empty matrices
-    averagedReps = zeros(length(stimNames), size(voxels{1},1));
-    averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
-    
-    %go through and add each averaged stimulus response to the empty average matrix
-    for stim = 1:length(stimNames);
-        %get the average of each of the halves of the stimuli (even or odds)
-        averagedRepsHalf1(stim,:) = mean(voxels{stim}(:,1:2:end),2);
-        averagedRepsHalf2(stim,:) = mean(voxels{stim}(:,2:2:end),2);
+function RSM = calculateRSM(voxels, stimNames, numStimRepeats)
+    %create empty RSM bootstraps
+    NumRSMBoots = 1000;
+    RSMBoots = zeros(length(stimNames),length(stimNames),NumRSMBoots);
+    %do the bootstrapping
+    for boot = 1:NumRSMBoots
+        %create empty matrices and shuffle order for this loop
+        averagedReps = zeros(length(stimNames), size(voxels{1},1));
+        averagedRepsHalf1 = averagedReps; averagedRepsHalf2 = averagedReps;
+        indices = randperm(numStimRepeats);
+        
+        %go through and add each averaged stimulus response to the empty average matrix
+        for stim = 1:length(stimNames);
+            %get the average of each of the halves of the stimuli (even or odds)
+            averagedRepsHalf1(stim,:) = mean(voxels{stim}(:,indices(1:end/2)),2);
+            averagedRepsHalf2(stim,:) = mean(voxels{stim}(:,indices(end/2+1:end)),2);
+        end
+        
+        %rename everything according to earlier convention
+        allBetasAveragedHalf1 = averagedRepsHalf1; allBetasAveragedHalf2 = averagedRepsHalf2;
+        
+        %make the RSM using halves.
+        half1 = corr(allBetasAveragedHalf1', allBetasAveragedHalf2');
+        half2 = corr(allBetasAveragedHalf2', allBetasAveragedHalf1');
+        RSMBoots(:,:,boot) = (half1+half2)/2;
     end
     
-    %rename everything according to earlier convention
-    allBetasAveragedHalf1 = averagedRepsHalf1; allBetasAveragedHalf2 = averagedRepsHalf2;
-    
-    %make the RSM using halves.
-    half1 = corr(allBetasAveragedHalf1', allBetasAveragedHalf2');
-    half2 = corr(allBetasAveragedHalf2', allBetasAveragedHalf1');
-    RSM = (half1+half2)/2;
+    %average the bootstraps
+    RSM = mean(RSMBoots,3);
     
     %plot it
     imagesc(RSM),
@@ -494,6 +571,7 @@ function plotROIReliability(roi, numStimRepeats, stimNames)
 %%%%%%%%%%%%%%%
 %average the RSMs of the different interpolations
 function averagedRSM = averageRSM(rsm, interpSets)
+flip = 0;
 averagedRSM = zeros(length(interpSets{1}), length(interpSets{1}));
 
 %concat different interpolations
@@ -511,6 +589,11 @@ normalizedRSM = (catRSM - minVal) ./ (maxVal - minVal); %
 %average
 averagedRSM = mean(normalizedRSM, 3);
 
+%flip it - this ablates the order (1:3 vs 4:6)
+if flip
+    averagedRSM = (rot90(rot90(averagedRSM)) + averagedRSM)/2;
+    sprintf('Flipping (180 rotation) and averaging the averaged RSM. This flips the order of the interpolations and averages induces rotational symmetry ')
+end
 
 
 
@@ -825,8 +908,14 @@ end
 %% PARTITION BY ROI AND FILTER BY VOXEL RELIABILITY
 for taskNum = 1:2
     for roi = 1:length(task{taskNum}.roiNames);
+        %this is just for plotting the betas. just set to 0. They are z-scored anyway, so this chart will always be mean 0.
+        if reliabilityCutoff > 1;
+            newReliabilityCutoff = 0;
+        else
+            newReliabilityCutoff = reliabilityCutoff;
+        end
         %face responses
-        task{taskNum}.averagedBetas{roi} = task{taskNum}.averaged_amplitudes((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),:);
+        task{taskNum}.averagedBetas{roi} = task{taskNum}.averaged_amplitudes((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > newReliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),:);
     end
 end
 
@@ -898,9 +987,17 @@ end
 %first, get all of the betas for individual stim types for rois
 for taskNum = 1:2
     for roi = 1:length(roiNames);
+        % if the reliability cutoff is >1, then pick that number of voxels for each roi.
+        if reliabilityCutoff > 1
+            sortedReliability = sort(task{taskNum}.reliability((task{taskNum}.whichROI == roi)'), 'descend');
+            newReliabilityCutoff = sortedReliability(reliabilityCutoff+1);
+        else
+            newReliabilityCutoff = reliabilityCutoff
+        end
+        %now sort by reliability, roi, etc
         for condition = 1:length(task{1}.stimNames);
         %get betas for individual trials, filtering by reliability
-            allBetas{taskNum}{roi}{condition} = task{taskNum}.betas((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > reliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),task{taskNum}.trial_conditions==condition);
+            allBetas{taskNum}{roi}{condition} = task{taskNum}.betas((task{taskNum}.whichROI == roi)' & (task{taskNum}.reliability > newReliabilityCutoff) & (task{taskNum}.glmR2_FIT_HRF_GLMdenoise_RR > r2cutoff),task{taskNum}.trial_conditions==condition);
         end
     end
 end
@@ -1017,9 +1114,6 @@ end
 % end
 % 
 % sgtitle('RSMs for all simuli in different areas')
-% 
-% 
-
 
 
 % %% do mlds on UNAVERAGED representations
