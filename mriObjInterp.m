@@ -20,7 +20,7 @@ function mriObjInterp(varargin)
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
-getArgs(varargin, {'reliabilityCutoff=150', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=100', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'truncateTrials=(10/10)', 'clean=1'});
 
 
@@ -30,12 +30,12 @@ getArgs(varargin, {'reliabilityCutoff=150', 'r2cutoff=-inf', 'shuffleData=0', 'z
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE rois shold be responsive
 
 %list the subjects you want. right now, you have to use the big rois from combineGlasserRois -> createBigRoi if you want to combine. might add more options later but atm seems like a pain in the ass for little return.
-subNumbers = {'s0605'};
+subNumbers = {'s0607'};
 
 %load each of the subjects data. You are getting a subject -> roi -> stimulus -> trial structure for each.
 for sub = 1:length(subNumbers)
     %get paths for that subject
-    dataPath = (strcat('~/data/interp/', subNumbers{sub}, '/betaFiles')); fileNames{1} = strcat(subNumbers{sub}, 'Task1BigROIs.mat'); fileNames{2} = strcat(subNumbers{sub}, 'Task2BigROIs.mat'); bigRois = 1;
+    dataPath = (strcat('~/data/interp/', subNumbers{sub}, '/betaFiles')); fileNames{1} = strcat(subNumbers{sub}, 'Task1BigROIsMiniV1.mat'); fileNames{2} = strcat(subNumbers{sub}, 'Task2BigROIsasdfas.mat'); bigRois = 1;
     %get the data. The task and everything else should be the same.
     [task, data{sub}, roiNames, numBetasEachScan, numScansInGLM, numStimRepeats, numUsableVoxels] =... 
     processData(reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, truncateTrials, dataPath, fileNames);
@@ -249,12 +249,22 @@ if clean, close, end
 
 
 %% LOAD IN AND PROCESS NEURAL NETWORK DATA
-% right now, ran on v1net.
-NNdata = load('NNcorrMatrices.mat');
-NNEVCRSM = (NNdata.layer_0 + NNdata.layer_1)/2; %V1 and V2 in the model
-NNMVCRSM = NNdata.layer_2; % V4 in the model
-NNVVSRSM = NNdata.layer_3; % IT in the model
-NNChoiceRSM = NNdata.layer_4; % 1000 way classification vector
+remapNSDfmri = 0;
+
+if ~remapNSDfmri
+    NNdata = load('NNcorrMatrices.mat');
+    NNEVCRSM = (NNdata.layer_0 + NNdata.layer_1)/2; %V1 and V2 in the model
+    NNMVCRSM = NNdata.layer_2; % V4 in the model
+    NNVVSRSM = NNdata.layer_3; % IT in the model
+    NNChoiceRSM = NNdata.layer_4; % 1000 way classification vector
+elseif remapNSDfmri
+    NNdata = load('NNcorrMatricesMapped.mat');
+    NNEVCRSM = NNdata.layer_0; %V1 and V2 in the model
+    NNMVCRSM = NNdata.layer_1; % V4 in the model
+    NNVVSRSM = NNdata.layer_2; % IT in the model
+    NNChoiceRSM = NNdata.layer_2; % 1000 way classification vector
+end
+
 
 NNEVCRSMAveraged = averageRSM(NNEVCRSM, interpSets);
 NNMVCRSMAveraged = averageRSM(NNMVCRSM, interpSets);
@@ -302,14 +312,17 @@ if clean, close, end
 
 
 %% PLOT EVIDENCE FOR CATEGORICAL VS LINEAR RSMS
-figure, hold on
+figure(100), hold on
 inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged BigROIRSMAveraged};
 compareCatRSM(inputRSMs, 0)
 
-figure, hold on
 NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged NNChoiceRSMAveraged};
 compareCatRSM(NNinputRSMs, 1)
-sgtitle("NEURAL NETWORK null category/linear matrix evidence")
+
+plotGaborWaveletRSMs(interpSets);
+
+%plotNNearlyLayers(interpSets)
+%
 
 
 %% Do MDS, PCA on the averaged RSMs
@@ -324,15 +337,116 @@ if clean, close, end
 
 
 
-%% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%%
-
-
-
-
+%% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%
 
 
 
 keyboard
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%
+%% plotGaborWaveletRSMs
+%%%%%%%%%%%%%%%%
+function plotGaborWaveletRSMs(interpSets)
+
+gaborData = load("gaborPyramidRSM.mat");
+gaborRSM = gaborData.allRSMs/6;
+
+%average
+gaborRSMAveraged = averageRSM(gaborRSM, interpSets);
+inputRSM = gaborRSMAveraged;
+
+%create null matrices
+categoricalRSM = [ones(3) zeros(3); zeros(3) ones(3)];
+linearRSM = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
+
+%find betas that describe input of linear/categorical matrices to observed matrix
+[categoricalBeta, linearBeta] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM);
+
+catDiff = categoricalBeta - linearBeta;
+figure(100),
+plot([1 4], [catDiff catDiff], 'r')
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% compareCatRSM
+%%%%%%%%%%%%%%%%%%%%%%
+function compareCatRSM(inputRSMs,network)
+
+% create the 2 null hypothesis matrices
+categoricalRSMCovar = [ones(3) zeros(3); zeros(3) ones(3)];
+linearRSMCovar = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
+linearDifference = 0;
+
+for inputNum = 1:length(inputRSMs)
+    %get the RSM and compute the idealized matrices based on measured variance
+    inputRSM = inputRSMs{inputNum};
+    if ~network
+        inputVar = sqrt(diag(inputRSM));
+        varMatrix = inputVar*inputVar';
+        categoricalRSM = varMatrix .* linearRSMCovar;
+        linearRSM = varMatrix .* categoricalRSMCovar;
+        color = 'b';
+    else
+        %neural networks have 1 along the diagonal - just normalize; don't do the variance adjustment.
+        categoricalRSM = categoricalRSMCovar;
+        linearRSM = linearRSMCovar;
+        color = 'cyan';
+    end
+    
+    %find betas that describe input of linear/categorical matrices to observed matrix
+    [categoricalBeta, linearBeta] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM);
+    figure(100)
+    scatter(inputNum, categoricalBeta - linearBeta, color,'filled'),
+
+end
+figure(100),
+hline(0,':k');
+
+legendEntries = repmat({''}, 1, length(inputRSMs)*2+1);
+legendEntries([2, 6]) = {'Human', 'Neural network'}; % Assign specific entries
+legend(legendEntries)
+
+xlim([0.5 4.5]), ylim([-1 1])
+xticks(1:inputNum), xticklabels({'EVC', 'MVC', 'VVS', 'allROIs/Choice layer'})
+ylabel('Categorical - Linear influence (difference between jointly fit betas)')
+
+
+
+
+%%%%%%%%%%%%%%%%%%
+%% findCatLinearEvidence %%
+%%%%%%%%%%%%%%%%%%%%%
+function [categoricalBeta, linearBeta] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM)
+
+%mask to ignore diagonal - it's the same between both conditions but might cause a shitty fit in the neural networks
+mask = ~eye(size(inputRSM));
+
+%define the objective function to minimize absolute difference
+objective = @(betas) sum(sum(abs(inputRSM(mask) - ...
+    (betas(1) * categoricalRSM(mask) + betas(2) * linearRSM(mask)))));
+
+% Optimize Betas using fminsearch
+betas = fminsearch(objective, [1, 1]) % Initial guesses for Betas
+
+%results
+figure, 
+subplot(1,2,1), imagesc(inputRSM), colormap(hot), colorbar, caxis([0 1]), title('input')
+subplot(1,2,2), imagesc(categoricalRSM * betas(1) + linearRSM * betas(2)), colormap(hot), colorbar, caxis([0 1]), title('fit RSM')
+clean=1; if clean, close, end
+
+
+categoricalBeta = betas(1)/sum(betas);
+linearBeta = betas(2)/sum(betas);
+
+
 
 
 
@@ -388,75 +502,6 @@ for inputNum = 1:length(inputRSMs)
     title('Scree'), xlabel('Eigenvector'), ylabel('Eigenvalue')
     
 end
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-%% compareCatRSM
-%%%%%%%%%%%%%%%%%%%%%%
-function compareCatRSM(inputRSMs,network)
-
-% create the 2 null hypothesis matrices
-categoricalRSMCovar = [ones(3) zeros(3); zeros(3) ones(3)];
-linearRSMCovar = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
-linearDifference = 0;
-
-for inputNum = 1:length(inputRSMs)
-    %figure(100), hold on
-    
-    %get the RSM and compute the idealized matrices based on measured variance
-    inputRSM = inputRSMs{inputNum};
-    if ~network
-        inputVar = sqrt(diag(inputRSM));
-        varMatrix = inputVar*inputVar';
-        categoricalRSM = varMatrix .* linearRSMCovar;
-        linearRSM = varMatrix .* categoricalRSMCovar;
-    else
-        %neural networks have 1 along the diagonal - just normalize; don't do the variance adjustment.
-        inputRSM = (inputRSM - min(inputRSM(:))) / (max(inputRSM(:)) - min(inputRSM(:)));
-        categoricalRSM = categoricalRSMCovar;
-        linearRSM = linearRSMCovar;
-    end
-    
-    % compute differences between null hypotheses
-    categoricalMatrixDifference = categoricalRSM - inputRSM;
-    linearMatrixDifference = linearRSM - inputRSM;
-    
-    %sum the absolute values
-    categoricalMatrixDifference = sum(sum(abs(categoricalMatrixDifference)));
-    linearMatrixDifference = sum(sum(abs(linearMatrixDifference)));
-
-    %bootstrap randomized version of the matrix
-    nullCategoricalMatrixDifferences = [];
-    for boot = 1:100;
-        nullCategoricalMatrixDifference = categoricalRSM - reshape(inputRSM(randperm(numel(inputRSM))), size(inputRSM));
-        %nullCategoricalMatrixDifference(logical(eye(size(nullCategoricalMatrixDifference)))) = 0;
-        nullCategoricalMatrixDifferences = [nullCategoricalMatrixDifferences (sum(sum(abs(nullCategoricalMatrixDifference))))];
-    end
-    nullCategoricalMatrixDifference = mean(nullCategoricalMatrixDifferences);
-
-    %plot how far off it is from the categorical matrix
-    scatter(inputNum, categoricalMatrixDifference, 'b','filled'),
-    scatter(inputNum, linearMatrixDifference, 'cyan','filled'),
-    scatter(inputNum, nullCategoricalMatrixDifference, 'r', 'filled')
-
-    %add lienar difference
-    linearDifference = linearDifference + (categoricalRSM - linearRSM);
-end
-
-%compute and plot linear interpolation null hypothesis like you did before
-linearDifference = linearDifference/length(inputRSMs);
-linearDifference = sum(sum(abs(linearDifference)));
-
-%plot and label things
-plot([1 inputNum], [linearDifference linearDifference], 'r');
-legendEntries = repmat({''}, 1, length(inputRSMs)*3+1);
-legendEntries([1, 2, 3, end]) = {'Categorical difference', 'Linear difference', 'Shuffled difference', 'Linear/Categorical difference'}; % Assign specific entries
-legend(legendEntries)
-xlim([0.5 4.5]), ylim([4 16])
-xticks(1:inputNum), xticklabels({'EVC', 'MVC', 'VVS', 'allROIs'})
-ylabel('Deviation from categorical RSM (summed differences)')
 
 
 
@@ -1088,6 +1133,39 @@ for subject = 2:length(data)
         end
     end
 end
+
+
+
+
+
+
+% 
+% %%%%%%%%%%%%%%%%%%%%%%% 
+% %% plot early NN layers %%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%
+% function plotNNearlyLayers(interpSets)
+% 
+% manyNNdata = load('NNcorrMatricesManyModels.mat');
+% models = fieldnames(manyNNdata);
+% 
+% for model = 1:length(models)
+%     NNdata = manyNNdata.(models{model});
+%     NNEVCRSM = (NNdata.layer_0 + NNdata.layer_1)/2; %V1 and V2 in the model
+%     NNMVCRSM = NNdata.layer_3; % V4 in the model
+%     NNVVSRSM = NNdata.layer_4; % IT in the model
+%     NNChoiceRSM = NNdata.layer_5; % 1000 way classification vector
+%     
+%     %average
+%     NNEVCRSMAveraged = averageRSM(NNEVCRSM, interpSets);
+%     NNMVCRSMAveraged = averageRSM(NNMVCRSM, interpSets);
+%     NNVVSRSMAveraged = averageRSM(NNVVSRSM, interpSets);
+%     NNChoiceRSMAveraged = averageRSM(NNChoiceRSM, interpSets);
+% 
+%     NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged NNChoiceRSMAveraged};
+%     compareCatRSM(NNinputRSMs, 1)
+% end
+% 
+
 
 
 
