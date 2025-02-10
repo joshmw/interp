@@ -20,7 +20,7 @@ function mriObjInterp(varargin)
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
-getArgs(varargin, {'reliabilityCutoff=100', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=150', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'truncateTrials=(10/10)', 'clean=1'});
 
 
@@ -30,7 +30,7 @@ getArgs(varargin, {'reliabilityCutoff=100', 'r2cutoff=-inf', 'shuffleData=0', 'z
 % Task 2 is LEFT visual field, so RIGHT HEMISPHERE rois shold be responsive
 
 %list the subjects you want. right now, you have to use the big rois from combineGlasserRois -> createBigRoi if you want to combine. might add more options later but atm seems like a pain in the ass for little return.
-subNumbers = {'s0607'};
+subNumbers = {'s0605', 's0606', 's0607'};
 
 %load each of the subjects data. You are getting a subject -> roi -> stimulus -> trial structure for each.
 for sub = 1:length(subNumbers)
@@ -269,7 +269,7 @@ end
 NNEVCRSMAveraged = averageRSM(NNEVCRSM, interpSets);
 NNMVCRSMAveraged = averageRSM(NNMVCRSM, interpSets);
 NNVVSRSMAveraged = averageRSM(NNVVSRSM, interpSets);
-NNChoiceRSMAveraged = averageRSM(NNChoiceRSM, interpSets)
+NNChoiceRSMAveraged = averageRSM(NNChoiceRSM, interpSets);
 
 %plot the averaged
 figure
@@ -322,7 +322,7 @@ compareCatRSM(NNinputRSMs, 1)
 plotGaborWaveletRSMs(interpSets);
 
 %plotNNearlyLayers(interpSets)
-%
+
 
 
 %% Do MDS, PCA on the averaged RSMs
@@ -367,9 +367,11 @@ linearRSM = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
 %find betas that describe input of linear/categorical matrices to observed matrix
 [categoricalBeta, linearBeta] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM);
 
-catDiff = categoricalBeta - linearBeta;
+%catDiff = categoricalBeta - linearBeta;
+catDiff = categoricalBeta / (categoricalBeta + linearBeta)
+
 figure(100),
-plot([1 4], [catDiff catDiff], 'r')
+plot([1 4], [catDiff catDiff], 'r', 'DisplayName','Gabor wavelets')
 
 
 
@@ -383,7 +385,6 @@ function compareCatRSM(inputRSMs,network)
 % create the 2 null hypothesis matrices
 categoricalRSMCovar = [ones(3) zeros(3); zeros(3) ones(3)];
 linearRSMCovar = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
-linearDifference = 0;
 
 for inputNum = 1:length(inputRSMs)
     %get the RSM and compute the idealized matrices based on measured variance
@@ -391,8 +392,8 @@ for inputNum = 1:length(inputRSMs)
     if ~network
         inputVar = sqrt(diag(inputRSM));
         varMatrix = inputVar*inputVar';
-        categoricalRSM = varMatrix .* linearRSMCovar;
-        linearRSM = varMatrix .* categoricalRSMCovar;
+        linearRSM = varMatrix .* linearRSMCovar;
+        categoricalRSM = varMatrix .* categoricalRSMCovar;
         color = 'b';
     else
         %neural networks have 1 along the diagonal - just normalize; don't do the variance adjustment.
@@ -404,7 +405,8 @@ for inputNum = 1:length(inputRSMs)
     %find betas that describe input of linear/categorical matrices to observed matrix
     [categoricalBeta, linearBeta] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM);
     figure(100)
-    scatter(inputNum, categoricalBeta - linearBeta, color,'filled'),
+    %scatter(inputNum, categoricalBeta - linearBeta, color,'filled'),
+    scatter(inputNum, categoricalBeta / (categoricalBeta + linearBeta), color,'filled'),
 
 end
 figure(100),
@@ -414,9 +416,11 @@ legendEntries = repmat({''}, 1, length(inputRSMs)*2+1);
 legendEntries([2, 6]) = {'Human', 'Neural network'}; % Assign specific entries
 legend(legendEntries)
 
-xlim([0.5 4.5]), ylim([-1 1])
+xlim([0.5 4.5]), ylim([0 0.5])
 xticks(1:inputNum), xticklabels({'EVC', 'MVC', 'VVS', 'allROIs/Choice layer'})
 ylabel('Categorical - Linear influence (difference between jointly fit betas)')
+ylabel('Structure attributable to catgeorical representation:  Bcat / (Bcat+Blinear)')
+
 
 
 
@@ -431,16 +435,19 @@ mask = ~eye(size(inputRSM));
 
 %define the objective function to minimize absolute difference
 objective = @(betas) sum(sum(abs(inputRSM(mask) - ...
-    (betas(1) * categoricalRSM(mask) + betas(2) * linearRSM(mask)))));
+    (betas(1) * categoricalRSM(mask) + betas(2) * linearRSM(mask))).^2));
 
 % Optimize Betas using fminsearch
-betas = fminsearch(objective, [1, 1]) % Initial guesses for Betas
+betas = fminsearch(objective, [.5, .5]) % Initial guesses for Betas
 
 %results
 figure, 
-subplot(1,2,1), imagesc(inputRSM), colormap(hot), colorbar, caxis([0 1]), title('input')
-subplot(1,2,2), imagesc(categoricalRSM * betas(1) + linearRSM * betas(2)), colormap(hot), colorbar, caxis([0 1]), title('fit RSM')
-clean=1; if clean, close, end
+subplot(2,2,1), imagesc(inputRSM), colormap(hot), colorbar, caxis([0 1]), title('input')
+subplot(2,2,2), imagesc(categoricalRSM * betas(1) + linearRSM * betas(2)), colormap(hot), colorbar, caxis([0 1]), title('fit RSM')
+subplot(2,2,3), imagesc(categoricalRSM), colormap(hot), colorbar, caxis([0 1]), title('Categorical')
+subplot(2,2,4), imagesc(linearRSM), colormap(hot), colorbar, caxis([0 1]), title('Linear')
+
+clean=0; if clean, close, end
 
 
 categoricalBeta = betas(1)/sum(betas);
