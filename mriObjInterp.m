@@ -20,7 +20,7 @@ function mriObjInterp(varargin)
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
-getArgs(varargin, {'reliabilityCutoff=150', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=300', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'truncateTrials=(10/10)', 'clean=1'});
 
 
@@ -105,27 +105,27 @@ plotROIReliability(allBetasVVSROI, numStimRepeats, stimNames)
 
 % RSM of the big ROI, combining all the small ROIS
 figure, subplot(2,2,1)
-[BigROIRSM, BigROIRSMstd] = calculateRSM(allBetasBigROI, stimNames, numStimRepeats);
+[BigROIRSM, BigROIRSMstd] = calculateRSM(allBetasBigROI, stimNames, numStimRepeats, 0);
 title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
 
 % RSM of the EVC ROI
 subplot(2,2,2)
-[EVCRSM, EVCRSMstd] = calculateRSM(allBetasEVCROI, stimNames, numStimRepeats);
+[EVCRSM, EVCRSMstd] = calculateRSM(allBetasEVCROI, stimNames, numStimRepeats, 0);
 title('RSM: EVC voxels. Correlation between averaged patterns of activity')
 
 % RSM of the mid ROI
 subplot(2,2,3)
-[MVCRSM, MVCRSMstd] = calculateRSM(allBetasMVCROI, stimNames, numStimRepeats);
+[MVCRSM, MVCRSMstd] = calculateRSM(allBetasMVCROI, stimNames, numStimRepeats, 0);
 title('RSM: Mid-ventral voxels. Correlation between averaged patterns of activity')
 
 % RSM of the VVC ROI
 subplot(2,2,4),
-[VVSRSM, VVSRSMstd] = calculateRSM(allBetasVVSROI, stimNames, numStimRepeats);
+[VVSRSM, VVSRSMstd] = calculateRSM(allBetasVVSROI, stimNames, numStimRepeats, 0);
 title('RSM: Ventral voxels. Correlation between averaged patterns of activity')
 
 % RSM of the Parietal ROI
 figure
-[ParietalRSM, ParietalRSMstd] = calculateRSM(allBetasParietalROI, stimNames, numStimRepeats);
+[ParietalRSM, ParietalRSMstd] = calculateRSM(allBetasParietalROI, stimNames, numStimRepeats, 0);
 title('RSM: Parietal voxels. Correlation between averaged patterns of activity')
 if clean, close, end
 
@@ -315,22 +315,22 @@ if clean, close, end
 figure(100), hold on
 
 %plot human data
-inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged BigROIRSMAveraged};
+inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged};
 compareCatRSM(inputRSMs, [0 0 1], 72, 1, 0, 100)
 
-%plot unaveraged human trials
-for interpSet = 1:length(interpSets)
-    inputRSMs = {EVCRSM(interpSets{interpSet}, interpSets{interpSet}) MVCRSM(interpSets{interpSet}, interpSets{interpSet}) VVSRSM(interpSets{interpSet}, interpSets{interpSet}) BigROIRSM(interpSets{interpSet}, interpSets{interpSet})};
-    compareCatRSM(inputRSMs, [0 0 1], 36, .5, 1, 100)
-end
+% %plot unaveraged human trials
+% for interpSet = 1:length(interpSets)
+%     inputRSMs = {EVCRSM(interpSets{interpSet}, interpSets{interpSet}) MVCRSM(interpSets{interpSet}, interpSets{interpSet}) VVSRSM(interpSets{interpSet}, interpSets{interpSet})};
+%     compareCatRSM(inputRSMs, [0 0 1], 36, .5, 1, 100)
+% end
 
-%plot unaveraged CORnet trials
-for interpSet = 1:length(interpSets)
-    inputRSMs = {NNEVCRSM(interpSets{interpSet}, interpSets{interpSet}) NNMVCRSM(interpSets{interpSet}, interpSets{interpSet}) NNVVSRSM(interpSets{interpSet}, interpSets{interpSet}) NNChoiceRSM(interpSets{interpSet}, interpSets{interpSet})};
-    compareCatRSM(inputRSMs, [0 1 1], 36, .5, 1, 100)
-end
-
-%plot averaged cornet
+% %plot unaveraged CORnet trials
+% for interpSet = 1:length(interpSets)
+%     inputRSMs = {NNEVCRSM(interpSets{interpSet}, interpSets{interpSet}) NNMVCRSM(interpSets{interpSet}, interpSets{interpSet}) NNVVSRSM(interpSets{interpSet}, interpSets{interpSet}) NNChoiceRSM(interpSets{interpSet}, interpSets{interpSet})};
+%     compareCatRSM(inputRSMs, [0 1 1], 36, .5, 1, 100)
+% end
+% 
+% %plot averaged cornet
 NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged NNChoiceRSMAveraged};
 compareCatRSM(NNinputRSMs, [0 1 1], 72, 1, 0, 100)
 
@@ -352,8 +352,11 @@ if clean, close, end
 
 
 %% Test the summary metric describing how categorical a matrix is
-figure, hold on
-testCompareCatRSM('k', 36, .2)
+%figure, hold on
+%testCompareCatRSM(10, 'k', 36, .2)
+
+
+
 
 
 
@@ -363,21 +366,14 @@ keyboard
 
 
 
-%%
 
-keyboard
-
-
-
-
-function testCompareCatRSM(color, size, alpha)
+function testCompareCatRSM(numBoots, color, size, alpha)
 
 % create the 2 null hypothesis matrices
 categoricalRSMCovar = [ones(3) zeros(3); zeros(3) ones(3)];
 linearRSMCovar = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
 
 %set parameters - boots, noise levels, categorical influence levels,
-numBoots = 100;
 noiseLevels = [.02:.02:.2];
 catLevels = [0 : 0.1 : 1];
 colors = jet(10);
@@ -402,14 +398,12 @@ for noiseLevel = 1:length(noiseLevels)
             categoricalRSM = categoricalRSMCovar;
             
             %find betas that describe input of linear/categorical matrices to observed matrix
-            [categoricalBeta, linearBeta] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM);
+            [categoricalBeta, linearBeta, r2] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM);
             %scatter(inputNum, categoricalBeta - linearBeta, color,'filled'),
             scatter(catLevel, categoricalBeta / (categoricalBeta + linearBeta), size, 'filled', 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', alpha),
         end
     end
 end
-
-
 
 
 
@@ -432,7 +426,7 @@ categoricalRSM = [ones(3) zeros(3); zeros(3) ones(3)];
 linearRSM = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
 
 %find betas that describe input of linear/categorical matrices to observed matrix
-[categoricalBeta, linearBeta] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM);
+[categoricalBeta, linearBeta, r2] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM, 1);
 
 %catDiff = categoricalBeta - linearBeta;
 catDiff = categoricalBeta / (categoricalBeta + linearBeta)
@@ -467,9 +461,16 @@ for inputNum = 1:length(inputRSMs)
     categoricalRSM = varMatrix .* categoricalRSMCovar;
     
     %find betas that describe input of linear/categorical matrices to observed matrix
-    [categoricalBeta, linearBeta] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM);
+    [categoricalBeta, linearBeta, r2] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM, inputNum);
+   
+    %plot the r2 of the fits
+    figure(figNum+1); hold on
+    scatter(inputNum, r2, size, 'filled', 'MarkerFaceColor', color, 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', alpha);
+    xticks(1:4), xticklabels({'EVC', 'MVC', 'VVS', 'Choice layer'}); ylabel('r-squared of RSM fit'); title('R-squared of RSM fit'), ylim([0 1])
+
+
+    %plot the percentrage of structure that is categorical
     figure(figNum)
-    %scatter(inputNum, categoricalBeta - linearBeta, color,'filled'),
     scatter(inputNum, categoricalBeta / (categoricalBeta + linearBeta), size, 'filled', 'MarkerFaceColor', color, 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', alpha),
 
 end
@@ -480,8 +481,9 @@ legendEntries([2, 6]) = {'Human', 'CORnet'}; % Assign specific entries
 legend(legendEntries)
 
 xlim([0.5 4.5])%, ylim([0 0.5])
-xticks(1:inputNum), xticklabels({'EVC', 'MVC', 'VVS', 'allROIs/Choice layer'})
+xticks(1:4), xticklabels({'EVC', 'MVC', 'VVS', 'Choice layer'})
 ylabel('Structure attributable to catgeorical representation:  Bcat / (Bcat+Blinear)')
+title('Categorical influence on RSM')
 
 
 
@@ -490,7 +492,7 @@ ylabel('Structure attributable to catgeorical representation:  Bcat / (Bcat+Blin
 %%%%%%%%%%%%%%%%%%
 %% findCatLinearEvidence %%
 %%%%%%%%%%%%%%%%%%%%%
-function [categoricalBeta, linearBeta] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM)
+function [categoricalBeta, linearBeta, r2] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM, inputNum)
 
 %mask to ignore diagonal - it's the same between both conditions but might cause a shitty fit in the neural networks
 mask = ~eye(size(inputRSM));
@@ -504,10 +506,21 @@ betas = fminsearch(objective, [.5, .5]) % Initial guesses for Betas
 
 %results
 figure, 
-subplot(2,2,1), imagesc(inputRSM), colormap(hot), colorbar, caxis([0 1]), title('input')
-subplot(2,2,2), imagesc(categoricalRSM * betas(1) + linearRSM * betas(2)), colormap(hot), colorbar, caxis([0 1]), title('fit RSM')
-subplot(2,2,3), imagesc(categoricalRSM), colormap(hot), colorbar, caxis([0 1]), title('Categorical')
-subplot(2,2,4), imagesc(linearRSM), colormap(hot), colorbar, caxis([0 1]), title('Linear')
+subplot(2,3,1), imagesc(inputRSM), colormap(hot), colorbar, caxis([0 1]), title('input')
+subplot(2,3,2), imagesc(categoricalRSM * betas(1) + linearRSM * betas(2)), colormap(hot), colorbar, caxis([0 1]), title('fit RSM')
+subplot(2,3,4), imagesc(categoricalRSM), colormap(hot), colorbar, caxis([0 1]), title('Categorical')
+subplot(2,3,5), imagesc(linearRSM), colormap(hot), colorbar, caxis([0 1]), title('Linear')
+
+%r-squared of the fit matrix
+fitRSM = categoricalRSM * betas(1) + linearRSM * betas(2);
+r2 = corr(fitRSM(:), inputRSM(:))^2;
+sprintf('r-squared between fit and input matrix: %1.3f', r2)
+subplot(2,3,3), hold on, scatter(inputRSM(~eye(size(fitRSM))), fitRSM(~eye(size(inputRSM))), 'k', 'filled')
+xlabel('Input RSM value'), ylabel('Fit RSM value'), title(sprintf('r-squared: %1.3f', corr(fitRSM(~eye(size(fitRSM))), inputRSM(~eye(size(inputRSM))))^2))
+plot([0 1], [0 1], 'k');
+
+subplot(2,3,6), scatter(inputNum, r2);
+
 
 clean=1; if clean, close, end
 
@@ -543,7 +556,7 @@ for model = 1:length(models)
     NNChoiceRSMAveraged = averageRSM(NNChoiceRSM, interpSets);
 
     %plot RSMs
-    figure(101)
+    figure(110)
     
     subplot(4,length(models),model + length(models) * 3), imagesc(NNChoiceRSMAveraged), colormap(hot), colorbar, caxis([0 1])
     title('Classification'),
@@ -560,7 +573,7 @@ for model = 1:length(models)
 
     %plot summary statistics
     NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged NNChoiceRSMAveraged};
-    compareCatRSM(NNinputRSMs, colors(model,:), 36, 0.3, 0, 100)
+    compareCatRSM(NNinputRSMs, colors(model,:), 36, 0.4, 0, 100)
 end
 
 
@@ -649,10 +662,15 @@ end
 %%%%%%%%%%%%%
 %% Calculate RSMs %%
 %%%%%%%%%%%%%%%%%%%%
-function [RSM, RSMstd] = calculateRSM(voxels, stimNames, numStimRepeats)
+function [RSM, RSMstd] = calculateRSM(voxels, stimNames, numStimRepeats, shuffle)
     %create empty RSM bootstraps
     NumRSMBoots = 1000;
     RSMBoots = zeros(length(stimNames),length(stimNames),NumRSMBoots);
+    %shuffle indices if you want
+    if shuffle
+        sprintf('!!!!YOU ARE SHUFFLING THE DATA!!!!!!')
+        voxels = voxels(randperm(length(voxels)));
+    end
     %do the bootstrapping
     for boot = 1:NumRSMBoots
         %create empty matrices and shuffle order for this loop
