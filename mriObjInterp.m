@@ -1,11 +1,11 @@
-function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals] = mriObjInterp(varargin)
+function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, VVSRSM, VVSDotProduct] = mriObjInterp(varargin)
 % interp_mriAnal.m
 %
 %  Takes the outputs of 'run_glmDenoiseInterp.m' (results) and does analyses.
 %
 %  Usage: interp_mriAnal(varargin)
 %  Authors: Josh wilson
-%  Date: 12/23/2024
+%  Date: 12/23/2024 
 %
 %  Arguments:
 %    reliabilityCutoff: split-half correlation of betas used to select voxels for analysis
@@ -20,7 +20,7 @@ function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
-getArgs(varargin, {'reliabilityCutoff=300', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=250', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'truncateTrials=(10/10)', 'clean=1', 'sub=s0605'});
 
 
@@ -68,6 +68,7 @@ if bigRois, midROIs = 3; end
 lateROIs = [13 15 21 23 25 27 29 31 33 39 41 45 47 49 51];
 if bigRois, lateROIs = 5; end
 [allBetasVVSROI, allBetasVVSROIAveraged] = createUsableROIs(lateROIs, allBetasCombinedFiltered, stimNames);
+VVSDotProduct = cell2mat(allBetasVVSROIAveraged)' * cell2mat(allBetasVVSROIAveraged);
 
 
 % "parietal" visual ROIs
@@ -249,12 +250,13 @@ if clean, close, end
 
 
 
-%% LOAD IN AND PROCESS NEURAL NETWORK DATA
+%% LOAD IN AND PROCESS NEURAL NETWORK DATA (VoneNet)
 remapNSDfmri = 0;
 
 if ~remapNSDfmri
     %NNdata = load('corrMatrices/CORNETcorrMatricesSoftmaxedNoBackground.mat');
-    NNdata = load('corrMatrices/CORNETcorrMatricesSoftmaxedMasked.mat');
+    NNdata = load(strcat(subNumbers{sub}, 'CORNETcorrMatricesSoftmaxedMasked.mat'));
+    NNdata = load('CORNETcorrMatricesSoftmaxedMasked2.mat');
     NNEVCRSM = NNdata.layer_0; %V1 in the model
     NNMVCRSM = NNdata.layer_2; % V4 in the model
     NNVVSRSM = NNdata.layer_3; % IT in the model
@@ -337,12 +339,15 @@ end
 %plot unaveraged CORnet trials
 for interpSet = 1:length(interpSets)
     inputRSMs = {NNEVCRSM(interpSets{interpSet}, interpSets{interpSet}) NNMVCRSM(interpSets{interpSet}, interpSets{interpSet}) NNVVSRSM(interpSets{interpSet}, interpSets{interpSet}) NNChoiceRSM(interpSets{interpSet}, interpSets{interpSet})};
-    [unaveragedCornetCatVals(interpSet, :), unaveragedCornetR2Vals(interpSet, :)] = compareCatRSM(inputRSMs, [0 1 1], 36, .5, 1, 100, 0, rsm_r2_cutoff);
+    [unaveragedCornetCatVals(interpSet, :), unaveragedCornetR2Vals(interpSet, :)] = compareCatRSM(inputRSMs, [0 1 1], 36, .5, 1, 100, 1, rsm_r2_cutoff);
 end
 
 % %plot controls
 %plotGaborWaveletRSMs(interpSets, 100);
-plotNNearlyLayers(interpSets, 'corrMatrices/NNcorrMatricesManyModelsSoftmaxedNoBackground.mat', rsm_r2_cutoff)
+%plotNNearlyLayers(interpSets, 'corrMatrices/NNcorrMatricesManyMANYModelsSoftmaxedMasked.mat', rsm_r2_cutoff)
+[unaveragedNNCatVals, unaveragedNNR2Vals] = plotNNearlyLayers(interpSets, strcat(subNumbers{sub}, 'NNcorrMatricesCandidateModelsSoftmaxedMasked.mat'), rsm_r2_cutoff)
+%plotNNearlyLayers(interpSets, 'corrMatrices/NNcorrMatricesManyModelsSoftmaxedMaskedNewExamples.mat', rsm_r2_cutoff)
+
 
 %plot averaged cornet
 NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged NNChoiceRSMAveraged};
@@ -405,7 +410,7 @@ compareBrainBehaviorModels(unaveragedBrainCatVals, unaveragedCornetCatVals, unav
 
 %% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%
 
-keyboard
+
 
 
 
@@ -638,7 +643,7 @@ linearBeta = betas(2)/sum(betas);
 %%%%%%%%%%%%%%%%%%%%%%% 
 %% plot early NN layers %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-function plotNNearlyLayers(interpSets, data, rsm_r2_cutoff)
+function [unaveragedNNCatVals, unaveragedNNR2Vals] = plotNNearlyLayers(interpSets, data, rsm_r2_cutoff)
 
 manyNNdata = load(data);
 models = fieldnames(manyNNdata);
@@ -676,11 +681,11 @@ for model = 1:length(models)
     %plot summary statistics
     NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged NNChoiceRSMAveraged};
     compareCatRSM(NNinputRSMs, colors(model,:), 36, 0.4, 0, 100, 0, rsm_r2_cutoff)
-
+    
+    %plot individual networks, individual interps
     for interpSet = 1:length(interpSets)
         inputRSMs = {NNEVCRSM(interpSets{interpSet}, interpSets{interpSet}) NNMVCRSM(interpSets{interpSet}, interpSets{interpSet}) NNVVSRSM(interpSets{interpSet}, interpSets{interpSet}) NNChoiceRSM(interpSets{interpSet}, interpSets{interpSet})};
-        [a b] = compareCatRSM(inputRSMs, colors(model,:), 36, .5, 1, 100, 1, rsm_r2_cutoff);
-        a
+        [unaveragedNNCatVals(interpSet,:,model), unaveragedNNR2Vals(interpSet,:,model)] = compareCatRSM(inputRSMs, colors(model,:), 36, .5, 1, 100, 1, rsm_r2_cutoff);
     end
 end
 
