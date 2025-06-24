@@ -15,12 +15,13 @@ function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals
 %    numBoots: number of bootstraps for split-half correlation analysis
 %    nVoxelsNeeded: Number of voxels an ROI needs to have to be included in the analysis (# voxels that meet reliability cutoff)
 %    mldsReps: number of mlds bootstraps. if set above 1, when averaging each condition, will average a random subset of trials instead of all
-%    plotBig: plots things in their own graphs rather than as subplots
+%    plotBig: plots
+% things in their own graphs rather than as subplots
 %    doROImlds: flag for if you want to do mlds in each ROI. takes a while to do this, so set to 0 to save time
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
-getArgs(varargin, {'reliabilityCutoff=250', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
+getArgs(varargin, {'reliabilityCutoff=150', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
     'truncateTrials=(10/10)', 'clean=1', 'sub=s0605'});
 
 
@@ -37,7 +38,7 @@ for sub = 1:length(subNumbers)
     %get paths for that subject
     dataPath = (strcat('~/data/interp/', subNumbers{sub}, '/betaFiles')); fileNames{1} = strcat(subNumbers{sub}, 'Task1BigROIsMiniV1.mat'); fileNames{2} = strcat(subNumbers{sub}, 'Task2BigROIsasdfas.mat'); bigRois = 1;
     %get the data. The task and everything else should be the same.
-    [task, data{sub}, roiNames, numBetasEachScan, numScansInGLM, numStimRepeats, numUsableVoxels] =... 
+    [task, data{sub}, roiNames, numBetasEachScan, numScansInGLM, numStimRepeats, numUsableVoxels, interpSets] =... 
     processData(reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, truncateTrials, dataPath, fileNames);
 end
 
@@ -47,8 +48,8 @@ allBetasCombinedFiltered = combineData(data);
 
 
 %% MAKE DIFFERENT LARGE ROIS (EARLY, MIDDLE, VENTRAL) AND ALSO MAKE AVERAGED VERSIONS
-stimNames = [1:24];
-interpSets = {[1:6], [7:12], [13:18], [19:24]};
+stimNames = [1:length(cell2mat(interpSets))];
+%interpSets = {[1:6], [7:12], [13:18], [19:24]};
 %interpSets = {[1:6], [13:18], [19:24]};
 colors = cool(numBetasEachScan/2);
 
@@ -108,27 +109,27 @@ plotROIReliability(allBetasVVSROI, numStimRepeats, stimNames)
 % RSM of the big ROI, combining all the small ROIS
 figure, subplot(2,2,1)
 [BigROIRSM, BigROIRSMstd] = calculateRSM(allBetasBigROI, stimNames, numStimRepeats, 0);
-title('RSM: All ROIs combined. Correlation between averaged patterns of activity')
+title('RSM: All ROIs')
 
 % RSM of the EVC ROI
 subplot(2,2,2)
 [EVCRSM, EVCRSMstd] = calculateRSM(allBetasEVCROI, stimNames, numStimRepeats, 0);
-title('RSM: EVC voxels. Correlation between averaged patterns of activity')
+title('RSM: V1 voxels')
 
 % RSM of the mid ROI
 subplot(2,2,3)
 [MVCRSM, MVCRSMstd] = calculateRSM(allBetasMVCROI, stimNames, numStimRepeats, 0);
-title('RSM: Mid-ventral voxels. Correlation between averaged patterns of activity')
+title('RSM: Mid-ventral voxels')
 
 % RSM of the VVC ROI
 subplot(2,2,4),
 [VVSRSM, VVSRSMstd] = calculateRSM(allBetasVVSROI, stimNames, numStimRepeats, 0);
-title('RSM: Ventral voxels. Correlation between averaged patterns of activity')
+title('RSM: Ventral voxels')
 
 % RSM of the Parietal ROI
 figure
 [ParietalRSM, ParietalRSMstd] = calculateRSM(allBetasParietalROI, stimNames, numStimRepeats, 0);
-title('RSM: Parietal voxels. Correlation between averaged patterns of activity')
+title('RSM: Parietal voxels')
 if clean, close, end
 
 
@@ -200,22 +201,22 @@ ParietalRSMAveraged = averageRSM(ParietalRSM, interpSets);
 %plot them
 figure
 
-subplot(2,2,1), imagesc(BigROIRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+subplot(2,2,1), imagesc(BigROIRSMAveraged), colormap(hot), colorbar
 title('RSM: All voxels'), xlabel('Interpolation number'), ylabel('Interpolation number')
 
-subplot(2,2,2), imagesc(EVCRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+subplot(2,2,2), imagesc(EVCRSMAveraged), colormap(hot), colorbar
 title('RSM: EVC Voxels'), xlabel('Interpolation number'), ylabel('Interpolation number')
 
-subplot(2,2,3), imagesc(MVCRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+subplot(2,2,3), imagesc(MVCRSMAveraged), colormap(hot), colorbar
 title('RSM: Mid-level voxels'), xlabel('Object number'), ylabel('Interpolation number')
 
-subplot(2,2,4), imagesc(VVSRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+subplot(2,2,4), imagesc(VVSRSMAveraged), colormap(hot), colorbar
 title('RSM: VVS voxels'), xlabel('Object number'), ylabel('Interpolation number')
 
 sgtitle('RSMs, averaged (post-normalization) over all interpolated stimulus sets')
 
 %parietal
-figure, imagesc(ParietalRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+figure, imagesc(ParietalRSMAveraged), colormap(hot), colorbar
 title('RSM: Parietal voxels'), xlabel('Object number'), ylabel('Interpolation number')
 if clean, close, end
 
@@ -248,15 +249,25 @@ title('Parietal RSM)')
 if clean, close, end
 
 
+%% LOAD IN AND PROCESS CONE MOSAIC DATA (isetBIO) 
+coneData = load(strcat(subNumbers{sub}, 'coneMosaic.mat'));
 
+%trim the cone data - allow for 4 sets but only take 3 if that's what was run
+coneSets =  {[1:2:11], [12:2:22], [23:2:33], [34:2:44]};
+coneSets = coneSets(1:length(interpSets));
+ConeRSM = corr(coneData.allImageExcitations(cell2mat(coneSets),:)');
+clear coneData;
+
+ConeRSMAveraged = averageRSM(ConeRSM, interpSets);
+
+figure, imagesc(ConeRSMAveraged), colormap(hot), colorbar, caxis([0 1])
+title('RSM: Averaged cone mosaics'), xlabel('Interpolation number'), ylabel('Interpolation number')
 
 %% LOAD IN AND PROCESS NEURAL NETWORK DATA (VoneNet)
 remapNSDfmri = 0;
 
 if ~remapNSDfmri
-    %NNdata = load('corrMatrices/CORNETcorrMatricesSoftmaxedNoBackground.mat');
     NNdata = load(strcat(subNumbers{sub}, 'CORNETcorrMatricesSoftmaxedMasked.mat'));
-    NNdata = load('CORNETcorrMatricesSoftmaxedMasked2.mat');
     NNEVCRSM = NNdata.layer_0; %V1 in the model
     NNMVCRSM = NNdata.layer_2; % V4 in the model
     NNVVSRSM = NNdata.layer_3; % IT in the model
@@ -317,6 +328,8 @@ if clean, close, end
 
 %% Behavioral categorization data
 fileName = strcat(subNumbers{1}, 'categorizationRSM.mat');
+
+
 %fileName = 's0607categorizationRSM.mat';
 categoryTaskRSM = load(fileName); categoryTaskRSM = categoryTaskRSM.rsm;
 
@@ -342,11 +355,17 @@ for interpSet = 1:length(interpSets)
     [unaveragedCornetCatVals(interpSet, :), unaveragedCornetR2Vals(interpSet, :)] = compareCatRSM(inputRSMs, [0 1 1], 36, .5, 1, 100, 1, rsm_r2_cutoff);
 end
 
-% %plot controls
+% plot controls
 %plotGaborWaveletRSMs(interpSets, 100);
 %plotNNearlyLayers(interpSets, 'corrMatrices/NNcorrMatricesManyMANYModelsSoftmaxedMasked.mat', rsm_r2_cutoff)
 [unaveragedNNCatVals, unaveragedNNR2Vals] = plotNNearlyLayers(interpSets, strcat(subNumbers{sub}, 'NNcorrMatricesCandidateModelsSoftmaxedMasked.mat'), rsm_r2_cutoff)
 %plotNNearlyLayers(interpSets, 'corrMatrices/NNcorrMatricesManyModelsSoftmaxedMaskedNewExamples.mat', rsm_r2_cutoff)
+
+%cone mosaic
+for interpSet = 1:length(interpSets)
+    inputRSMs = {ConeRSM(interpSets{interpSet}, interpSets{interpSet})};
+    [unaveragedConeCatVals(interpSet, :), unaveragedConeR2Vals(interpSet, :)] = compareCatRSM(inputRSMs, [0 1 1], 36, .5, 1, 100, 0, rsm_r2_cutoff);
+end
 
 
 %plot averaged cornet
@@ -397,7 +416,7 @@ compareBrainBehaviorModels(unaveragedBrainCatVals, unaveragedCornetCatVals, unav
 
 %% Test the summary metric describing how categorical a matrix is
 %figure, hold on
-%testCompareCatRSM(10, 'k', 36, .2)
+%testCompareCatRSM(10, 'k', 36, .2)l
 
 
 %% test monkey data
@@ -411,11 +430,7 @@ compareBrainBehaviorModels(unaveragedBrainCatVals, unaveragedCornetCatVals, unav
 %% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%
 
 
-
-
-
-
-
+keyboard
 
 
 
@@ -922,6 +937,7 @@ function doClassification(classificationVoxels, colors, task, numStimRepeats, in
         %get data for SVM
         data = [classificationVoxels{end1}'; classificationVoxels{end2}'];
         labels = [repmat(0,1,numStimRepeats) repmat(1,1,numStimRepeats)];
+        keyboard
         %fit it
         numFolds = 5;
         svm = fitcsvm(data, labels, 'CrossVal', 'on', 'KFold', numFolds);
@@ -1092,7 +1108,7 @@ function totalProb = computeLoss(params, ims, responses)
 %%%%%%%%%%%%%%%%%%
 %% processData
 %%%%%%%%%%%%%%%%%%
-function [task, allBetasCombinedFiltered, roiNames, numBetasEachScan, numScansInGLM, numStimRepeats, numUsableVoxelsByROI] = processData(...
+function [task, allBetasCombinedFiltered, roiNames, numBetasEachScan, numScansInGLM, numStimRepeats, numUsableVoxelsByROI, interpSets] = processData(...
     reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, ...
     truncateTrials, dataPath, fileNames);
 
@@ -1117,10 +1133,17 @@ numBetasEachScan = task{1}.numBetasEachScan;
 numScansInGLM = task{1}.numScansInGLM;
 numStimRepeats = task{1}.numStimRepeats;
 
+if ~isfield(task{1}, 'interpSets')
+    interpSets = {[1:6], [7: 12], [13:18], [19:24]};
+else
+    interpSets = task{1}.interpSets;
+end
 
 %fix the stim names thing - remove the duplicate of the blanks (in this case, 1 8 15 22
 for taskNum = 1:2,
-    blanks = [1 8 15 22]; for blank = blanks, task{taskNum}.stimNames(blank) = []; end
+    blanks = [1 8 15 22];
+    blanks = blanks(1:length(interpSets));
+    for blank = blanks, task{taskNum}.stimNames(blank) = []; end
 end
 
 %swap the roiNums for task 2 so that we can do both hemispheres together
