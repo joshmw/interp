@@ -1,4 +1,4 @@
-function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, VVSRSM, VVSDotProduct] = mriObjInterp(varargin)
+function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals] = mriObjInterp(varargin)
 % interp_mriAnal.m
 %
 %  Takes the outputs of 'run_glmDenoiseInterp.m' (results) and does analyses.
@@ -430,7 +430,6 @@ compareBrainBehaviorModels(unaveragedBrainCatVals, unaveragedCornetCatVals, unav
 %% %%%%%%%%%%%% END OF SCRIPT %%%%%%%%%%%%%%%%%
 
 
-keyboard
 
 
 
