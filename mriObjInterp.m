@@ -2,10 +2,11 @@ function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals
 % interp_mriAnal.m
 %
 %  Takes the outputs of 'run_glmDenoiseInterp.m' (results) and does analyses.
+%  Runs individual subjects, and can be looped over by "runMriObjInterp.m" to save outputs.
 %
 %  Usage: interp_mriAnal(varargin)
 %  Authors: Josh wilson
-%  Date: 12/23/2024 
+%  Date: 12/23/2024
 %
 %  Arguments:
 %    reliabilityCutoff: split-half correlation of betas used to select voxels for analysis
