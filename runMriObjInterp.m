@@ -7,7 +7,7 @@ numSubs = size(subs,1)
 for sub = 1:numSubs
 
     %get the values
-    [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals] = mriObjInterp(subs(sub,:));
+    [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals] = mriObjInterp(subs(sub,:));
 
     %save them
     brainCatVals{sub} = unaveragedBrainCatVals;
@@ -21,6 +21,7 @@ for sub = 1:numSubs
     EVCRSMs{sub} = EVCRSM;
     MVCRSMs{sub} = MVCRSM;
     VVSRSMs{sub} = VVSRSM;
+    BigROIRSMs{sub} = BigROIRSM;
     VVSDotProducts{sub} = VVSDotProduct;
     NNCatVals{sub} = unaveragedNNCatVals;
     NNR2Vals{sub} = unaveragedNNR2Vals;
@@ -101,36 +102,9 @@ xlabel('Mlds categorical index'), ylabel('Brain categorical index'), title('Whol
 
 
 %% do "classification" with the brain data by comparing how close the endpoints are
-figure
-interpSets = {[1:6], [7:12], [13:18], [19:24]};
 
-x = []; y = [];
-for sub = 1:numSubs
-    for set = 1:length(VVSRSMs{sub})/6
-        low = min(interpSets{set}); high = max(interpSets{set});
-        dists = VVSRSMs{sub}(low:high,high) - VVSRSMs{sub}(low:high,low); ylabelstr = 'Corr(interp,6) - Corr(interp, 1)';
-        %dists = VVSDotProducts{sub}(low:high,high) - VVSDotProducts{sub}(low:high,low); ylabelstr = 'Dot(interp,6) - Dot(interp, 1)';
+plotPsychometricsFromRSMs(MVCRSMs, numSubs)
 
-        subplot(1,2,1), hold on, plot([1 6], [0 0], '--k'), xlim([0.5, 6.5])
-        scatter(1:6, dists, 'k', 'filled', 'MarkerFaceAlpha', 0.2, 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w')
-        ylabel(ylabelstr), xlabel('Interpolation point')
-        title('Relative distance to endpoints')
-
-        subplot(1,2,2), hold on, ylim([0.8 2.2]), xlim([0.5, 6.5])
-        scatter(1:6, (dists>0)+1, 'k', 'filled', 'MarkerFaceAlpha', 0.1, 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w')
-        ylabel('Closest endpoint'), xlabel('Interpolation point')
-        title('Classification of interpolations')
-        x = [x 1:6]; y = [y dists>0];
-
-    end
-end
-
-g = fitCumulativeGaussian(x,y(:)');
-plot(g.fitX,g.fitY+1, 'k')
-
-for interp = 1:6, choices(interp) = g.fitY(g.fitX == interp); end
-brainCatTaskMatrix = 1- dist(choices);
-[c r] = compareCatRSM(brainCatTaskMatrix, 1);
 
 
 
@@ -254,6 +228,58 @@ legend([h1, h2, h3, h4, h5]);
 keyboard
 
 
+
+
+%% 
+function plotPsychometricsFromRSMs(RSMs, numSubs)
+
+figure
+
+interpSets = {[1:6], [7:12], [13:18], [19:24]};
+
+x = []; y = []; trueY = [];
+for sub = 1:numSubs
+    for set = 1:length(RSMs{sub})/6
+        low = min(interpSets{set}); high = max(interpSets{set});
+        dists = RSMs{sub}(low:high,high) - RSMs{sub}(low:high,low);
+
+        subplot(1,3,1), hold on, plot([1 6], [0 0], '--k'), xlim([0.5, 6.5])
+        scatter(1:6, dists, 'k', 'filled', 'MarkerFaceAlpha', 0.2, 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w')
+        ylabel('Corr(interp,6) - Corr(interp, 1)'), xlabel('Interpolation point')
+        title('Relative distance to endpoints')
+
+        subplot(1,3,2), hold on, ylim([0.8 2.2]), xlim([0.5, 6.5])
+        scatter(1:6, (dists>0)+1, 'k', 'filled', 'MarkerFaceAlpha', 0.1, 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w')
+        ylabel('Closest endpoint'), xlabel('Interpolation point')
+        title('Classification of interpolations')
+        x = [x 1:6]; y = [y dists>0]; trueY = [trueY dists];
+
+    end
+end
+
+%plot the medians
+subplot(1,3,1), scatter(1:6, mean(trueY,2), 48, 'cyan', 'filled')
+subplot(1,3,2), scatter(1:6, mean(y,2)+1, 48, 'cyan', 'filled')
+
+
+%normalize the correlation values between 0 and 1 so you can fit psychometrics
+subplot(1,3,3), hold on, ylim([-0.1 1.1]), xlim([-0.1 6.1]), title('Relative distance (normalized)')
+ylabel('Corr(interp,6) - Corr(interp, 1) (normalized)'), xlabel('Interpolation point')
+
+scaledTrueY = trueY;
+scaledTrueY = (scaledTrueY - min(min(scaledTrueY)))/(max(max(scaledTrueY)) - min(min(scaledTrueY)));
+
+g = fitCumulativeGaussian(x,scaledTrueY(:)');
+plot(g.fitX,g.fitY, 'k'), hold on
+scatter(x, scaledTrueY(:), 'k', 'filled', 'MarkerFaceAlpha', 0.1, 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w');
+scatter(1:6, mean(scaledTrueY,2), 48, 'cyan', 'filled')
+
+g2 = fitCumulativeGaussian(x,y(:)');
+subplot(1,3,2), plot(g2.fitX,g2.fitY+1, 'k')
+
+for interp = 1:6, choices(interp) = g.fitY(g.fitX == interp); end
+brainCatTaskMatrix = 1- dist(choices);
+[c r] = compareCatRSM(brainCatTaskMatrix, 1);
 
 
 
