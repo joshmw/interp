@@ -1,8 +1,9 @@
-function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals] = mriObjInterp(varargin)
+function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals] = mriObjInterp(varargin)
 % interp_mriAnal.m
 %
 %  Takes the outputs of 'run_glmDenoiseInterp.m' (results) and does analyses.
 %  Runs individual subjects, and can be looped over by "runMriObjInterp.m" to save outputs.
+%  Hi, psych summer!
 %
 %  Usage: interp_mriAnal(varargin)
 %  Authors: Josh wilson
