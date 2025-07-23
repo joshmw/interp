@@ -1,9 +1,8 @@
-function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals] = mriObjInterp(varargin)
+function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals, mldsRSM, categoryTaskRSM] = mriObjInterp(varargin)
 % interp_mriAnal.m
 %
 %  Takes the outputs of 'run_glmDenoiseInterp.m' (results) and does analyses.
 %  Runs individual subjects, and can be looped over by "runMriObjInterp.m" to save outputs.
-%  Hi, psych summer!
 %
 %  Usage: interp_mriAnal(varargin)
 %  Authors: Josh wilson
@@ -17,14 +16,13 @@ function [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals
 %    numBoots: number of bootstraps for split-half correlation analysis
 %    nVoxelsNeeded: Number of voxels an ROI needs to have to be included in the analysis (# voxels that meet reliability cutoff)
 %    mldsReps: number of mlds bootstraps. if set above 1, when averaging each condition, will average a random subset of trials instead of all
-%    plotBig: plots
-% things in their own graphs rather than as subplots
+%    plotBig: plots things in their own graphs rather than as subplots
 %    doROImlds: flag for if you want to do mlds in each ROI. takes a while to do this, so set to 0 to save time
 %    truncateTrials: If you want to use less data. Should set as a fraction of m/n, where n is numScansInGLM and m is the number of scans you want to use for data. Use 1 for all.
 
 %get args
 getArgs(varargin, {'reliabilityCutoff=150', 'r2cutoff=-inf', 'shuffleData=0', 'zscorebetas=1', 'numBoots=250', 'nVoxelsNeeded=20', 'mldsReps=1', 'plotBig=0', 'doROImlds=1,'...
-    'truncateTrials=(10/10)', 'clean=1', 'sub=s0605'});
+    'truncateTrials=(10/10)', 'clean=1', 'sub=s0615'});
 
 
 %% LOAD AND PROCESS THE DATA
@@ -38,7 +36,7 @@ subNumbers = {sub};
 %load each of the subjects data. You are getting a subject -> roi -> stimulus -> trial structure for each.
 for sub = 1:length(subNumbers)
     %get paths for that subject
-    dataPath = (strcat('~/data/interp/', subNumbers{sub}, '/betaFiles')); fileNames{1} = strcat(subNumbers{sub}, 'Task1BigROIsMiniV1.mat'); fileNames{2} = strcat(subNumbers{sub}, 'Task2BigROIsasdfas.mat'); bigRois = 1;
+    dataPath = (strcat('~/data/interp/', subNumbers{sub}, '/betaFiles')); fileNames{1} = strcat(subNumbers{sub}, 'Task1BigROIsMiniV1pRF.mat'); fileNames{2} = strcat(subNumbers{sub}, 'Task2BigROIsasdfas.mat'); bigRois = 1;
     %get the data. The task and everything else should be the same.
     [task, data{sub}, roiNames, numBetasEachScan, numScansInGLM, numStimRepeats, numUsableVoxels, interpSets] =... 
     processData(reliabilityCutoff, r2cutoff, shuffleData, zscorebetas, numBoots, nVoxelsNeeded, plotBig, truncateTrials, dataPath, fileNames);
@@ -386,14 +384,14 @@ end
 
 
 %% Do MDS, PCA on the averaged RSMs
-figure, hold on
-inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged BigROIRSMAveraged};
-doMDSPCA(inputRSMs,2)
-
-figure, hold on
-NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged};
-doMDSPCA(NNinputRSMs,2)
-if clean, close, end
+% figure, hold on
+% inputRSMs = {EVCRSMAveraged MVCRSMAveraged VVSRSMAveraged BigROIRSMAveraged};
+% doMDSPCA(inputRSMs,2)
+% 
+% figure, hold on
+% NNinputRSMs = {NNEVCRSMAveraged NNMVCRSMAveraged NNVVSRSMAveraged};
+% doMDSPCA(NNinputRSMs,2)
+% if clean, close, end
 
 
 %% Do behavioral anaylses, if you can.
@@ -412,6 +410,67 @@ end
 
 compareBrainBehaviorModels(unaveragedBrainCatVals, unaveragedCornetCatVals, unaveragedMldsCatVals, unaveragedBrainR2Vals, rsm_r2_cutoff, 105)
 
+
+
+
+
+%% plot the estimated prf coverage
+%find the coordinates
+v1LeftVoxels = find((task{1}.reliability > task{1}.reliabilityCutoff{1}) & (task{1}.whichROI == 1)')';
+v1RightVoxels = find((task{1}.reliability > task{1}.reliabilityCutoff{2}) & (task{1}.whichROI == 2)')';
+v1LeftScanCoords = task{1}.scanCoords{1}{1}(1:3,v1LeftVoxels);
+v1RightScanCoords = task{1}.scanCoords{1}{2}(1:3,v1RightVoxels - min(find(task{1}.whichROI==2)) + 1) ; %index because they are saved differently
+
+polarAngle = [];
+eccentricity = [];
+rfSize = [];
+
+for voxel = 1:size(v1RightScanCoords,2)
+    polarAngle = [polarAngle task{1}.polrAngle(v1RightScanCoords(1,voxel), v1RightScanCoords(2,voxel), v1RightScanCoords(3,voxel)) + 90];
+    polarAngle = [polarAngle task{1}.polrAngle(v1LeftScanCoords(1,voxel), v1LeftScanCoords(2,voxel), v1LeftScanCoords(3,voxel)) - 90];
+    eccentricity = [eccentricity task{1}.eccentricity(v1RightScanCoords(1,voxel), v1RightScanCoords(2,voxel), v1RightScanCoords(3,voxel))];
+    eccentricity = [eccentricity task{1}.eccentricity(v1LeftScanCoords(1,voxel), v1LeftScanCoords(2,voxel), v1LeftScanCoords(3,voxel))];
+    rfSize = [rfSize task{1}.rfSize(v1RightScanCoords(1,voxel), v1RightScanCoords(2,voxel), v1RightScanCoords(3,voxel))];
+    rfSize = [rfSize task{1}.rfSize(v1LeftScanCoords(1,voxel), v1LeftScanCoords(2,voxel), v1LeftScanCoords(3,voxel))];
+
+end
+
+%quick polar scatter
+figure, polarscatter(deg2rad(polarAngle), eccentricity)
+
+%draw the rf as gaussians
+figure
+v = isfinite(polarAngle) & isfinite(eccentricity) & rfSize>0;       
+[x,y] = pol2cart(polarAngle(v)*pi/180, eccentricity(v));           
+s     = rfSize(v);
+r     = max(eccentricity(v));
+[X,Y] = meshgrid(-r:.5:r);                                          
+Z     = zeros(size(X));
+for k = 1:numel(x)
+    Z = Z + exp(-((X-x(k)).^2 + (Y-y(k)).^2) ./ (2*s(k)^2));
+end
+imagesc(X(1,:), Y(:,1), Z); axis xy; colorbar
+
+% draw the RF as cricles
+v = rfSize>0 & isfinite(polarAngle) & isfinite(eccentricity);
+[x,y] = pol2cart(polarAngle(v)*pi/180, eccentricity(v));
+s = rfSize(v);
+t = linspace(0,2*pi,100);
+r = max(eccentricity(v));
+figure; hold on
+for i = 1:numel(x)
+    patch(x(i)+s(i)*cos(t), y(i)+s(i)*sin(t), 'k', 'FaceAlpha', .1, 'EdgeColor', 'none');
+end
+axis equal, xlim([-r r]), ylim([-r r])
+xlabel('X (°)'), ylabel('Y (°)'), title('Receptive‑Field Coverage')
+
+%%
+
+
+
+
+
+%%
 
 
 %%%%%%%%%%%%%%%%%%%%% ADDITIONAL TESTS %%%%%%%%%%%%%%%%%%%%
@@ -1170,6 +1229,7 @@ end
 %note that we calculated reliability before truncating. Might want to switch.
 numStimRepeats = numStimRepeats * truncateTrials;
 numScansInGLM = numScansInGLM * truncateTrials;
+
 for taskNum = 1:2,
     task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd = task{taskNum}.models.FIT_HRF_GLMdenoise_RR.modelmd(:,:,:,1:(numBetasEachScan*numScansInGLM));
     task{taskNum}.trial_conditions = task{taskNum}.trial_conditions(1:(numBetasEachScan*numScansInGLM));
@@ -1319,8 +1379,9 @@ for taskNum = 1:2
             sortedReliability = sort(task{taskNum}.reliability((task{taskNum}.whichROI == roi)'), 'descend');
             newReliabilityCutoff = sortedReliability(reliabilityCutoff+1);
         else
-            newReliabilityCutoff = reliabilityCutoff
+            newReliabilityCutoff = reliabilityCutoff;
         end
+        task{taskNum}.reliabilityCutoff{roi} = newReliabilityCutoff;
         %now sort by reliability, roi, etc
         for condition = 1:length(task{1}.stimNames);
         %get betas for individual trials, filtering by reliability
