@@ -1,13 +1,14 @@
 function runMriObjInterp
 
 %% first, get all the data
-subs = ['sub=s0605'; 'sub=s0606'; 'sub=s0607'; 'sub=s0608'; 'sub=s0609'; 'sub=s0610']
+subs = ['sub=s0605'; 'sub=s0606'; 'sub=s0607'; 'sub=s0608'; 'sub=s0609'; 'sub=s0610'; 'sub=s0612'; 'sub=s0613'; 'sub=s0614'; 'sub=s0615'; 'sub=s0616'; 'sub=s0617']
+%subs = ['sub=s0613'; 'sub=s0614'; 'sub=s0615'; 'sub=s0616'; 'sub=s0617']
 numSubs = size(subs,1)
 
 for sub = 1:numSubs
 
     %get the values
-    [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals] = mriObjInterp(subs(sub,:));
+    [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals, mldsRSM, categoryTaskRSM] = mriObjInterp(subs(sub,:));
 
     %save them
     brainCatVals{sub} = unaveragedBrainCatVals;
@@ -27,15 +28,21 @@ for sub = 1:numSubs
     NNR2Vals{sub} = unaveragedNNR2Vals;
     coneCatVals{sub} = unaveragedConeCatVals;
     coneR2Vals{sub} = unaveragedConeR2Vals;
+    mldsRSMs{sub} = mldsRSM;
+    categoryTaskRSMs{sub} = categoryTaskRSM;
+    close all
 end
-
+%%
+labels = getLabels;
+numLabels = 8;
+%colors = [linspace(0,34,numLabels)', linspace(0,139,numLabels)', linspace(139,34,numLabels)'] / 255;
+colors = hsv(8);
+%%
 
 keyboard
 
 
 %% sort the data to be usable - get out of cells
-r2_cutoff = 0.75;
-
 brainCatVals = cell2mat(brainCatVals');
 brainR2Vals = cell2mat(brainR2Vals');
 cornetCatVals = cell2mat(cornetCatVals');
@@ -54,7 +61,7 @@ catTaskR2Vals = brainR2Vals(:,4);
 
 
 %% set cutoffs
-catTaskR2Cutoff = 0.92;
+catTaskR2Cutoff = 0.9;
 mldsR2Cutoff = 0.8;
 brainR2Cutoff = 0.5; 
 NNR2Cutoff = 0.9;
@@ -66,24 +73,33 @@ coneR2Cutoff = 0.8;
 %% Do some analyses
 %brain vs mlds
 figure, hold on
+%plotMldsVals = []; plotBrainCatVals = [];
 for area = 1:3,
     %subplot(1,3,area)
     scatter(brainCatVals((brainR2Vals(:,area) > brainR2Cutoff) & (mldsR2Vals > mldsR2Cutoff), area) , mldsCatVals((brainR2Vals(:,area) > brainR2Cutoff) & (mldsR2Vals > mldsR2Cutoff)), 'filled')
     plot([0 1], [0 1], '--k')
+    %plotMldsVals = [plotMldsVals mldsCatVals((brainR2Vals(:,area) > brainR2Cutoff) & (mldsR2Vals > mldsR2Cutoff))']; plotBrainCatVals = [plotBrainCatVals brainCatVals((brainR2Vals(:,area) > brainR2Cutoff) & (mldsR2Vals > mldsR2Cutoff), area)'];
 end
 xlabel('Brain categorical index'), ylabel('Mlds categorical index'), title('Brain and MLDS categorical indices')
+xlim([-0.2 1]), ylim([-0.2 1])
 legend({'Early', '', 'Middle', '', 'Late'})
 
 
 %brain vs categorization
 figure, hold on
+plotCatVals = []; plotBrainCatVals = [];
 for area = 1:3,
     %subplot(1,3,area)
     scatter(brainCatVals((brainR2Vals(:,area) > brainR2Cutoff) & (mldsR2Vals > mldsR2Cutoff), area) , brainCatVals((brainR2Vals(:,area) > brainR2Cutoff) & (mldsR2Vals > mldsR2Cutoff), 4), 'filled')
     plot([0 1], [0 1], '--k')
+    plotCatVals = [plotCatVals brainCatVals((brainR2Vals(:,area) > brainR2Cutoff) & (mldsR2Vals > mldsR2Cutoff), 4)']; plotBrainCatVals = [plotBrainCatVals brainCatVals((brainR2Vals(:,area) > brainR2Cutoff) & (mldsR2Vals > mldsR2Cutoff), area)'];
 end
 xlabel('Brain categorical index'), ylabel('Cat task categorical index'), title('Brain and categorization categorical indices')
+xlim([-0.2 1]), ylim([-0.2 1])
 legend({'Early', '', 'Middle', '', 'Late'})
+
+[C,P]=corrcoef(plotBrainCatVals,plotCatVals); plot(plotBrainCatVals,polyval(polyfit(plotBrainCatVals,plotCatVals,1),plotBrainCatVals),'b-');
+legend({'Early', '', 'Middle', '', 'Late', '', sprintf('Fit (r=%.2f, p=%.3f)',C(1,2),P(1,2))},'Location','best');
 
 %mlds vs categorization
 figure, hold on
@@ -103,8 +119,7 @@ xlabel('Mlds categorical index'), ylabel('Brain categorical index'), title('Whol
 
 %% do "classification" with the brain data by comparing how close the endpoints are
 
-plotPsychometricsFromRSMs(MVCRSMs, numSubs)
-
+plotPsychometricsFromRSMs(VVSRSMs, numSubs)
 
 
 
@@ -114,7 +129,7 @@ figure, hold on, xlim([0.5 4.5]), ylim([-0.1 1.1])
 
 
 % Initialize storage
-filtered_NNCatVals = cell(size(NNR2Vals,3), 4);  % {model, area}
+filtered_NNCatVals = cell(size(NNR2Vals,3), 4);
 filtered_cornetCatVals = cell(1,4);
 filtered_brainCatVals = cell(1,3);
 filtered_mldsCatVals = [];
@@ -206,15 +221,79 @@ h5 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', [1 0 0], 'MarkerEdgeColo
 legend([h1, h2, h3, h4, h5]);
 
 
+save = 0;
+if save
+    drawPublishAxis('labelFontSize=8','figSize=[8, 7]','lineWidth=0.5');
+    savepdf(figure(2),'~/Desktop/catFigs/comps/bigFigure') ;
+end
+
+
+%% show the human brain RSMs
+figure
+for sub = 1:length(VVSRSMs)
+    subplot(4,3,sub)
+    imagesc(VVSRSMs{sub}), colorbar, colormap('hot')
+end
 
 
 
 
 
+%% plot the behavioral data
+interpSets = {[1:6], [7:12], [13:18], [19:24]};
+k=1;
+for sub = 1:length(mldsRSMs)
+    for interpSet = 1:length(mldsRSMs{sub})/6
+        %get the mlds curve
+        y = mldsRSMs{sub}(interpSets{interpSet},max(interpSets{interpSet}));
+        x = 1:6;
+        mldsFit = fitCumulativeGaussian(x,y);
+        %plot
+        figure(70), hold on
+        plot(mldsFit.fitX, mldsFit.fitY, 'Color', [colors(labels{sub}(interpSet),:) 0.5]);
+
+        %categorization
+        y = categoryTaskRSMs{sub}(interpSets{interpSet},max(interpSets{interpSet}));
+        x = 1:6;
+        catFit = fitCumulativeGaussian(x,y);
+        %plot
+        figure(71), hold on
+        plot(catFit.fitX, catFit.fitY, 'Color', [colors(labels{sub}(interpSet),:) 0.5]);
+
+        %scatters
+        figure(72), hold on
+        scatter(mldsFit.mean, catFit.mean, [], colors(labels{sub}(interpSet),:), 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
+
+        figure(73), hold on
+        scatter(mldsFit.std, catFit.std, [], colors(labels{sub}(interpSet),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
+        
+        %mlds vs categorical index
+        figure(74), hold on, scatter(mldsCatVals(k), mldsFit.std, 'MarkerFaceColor', colors(labels{sub}(interpSet),:), 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w'), k = k+1;
+    end
+end
+
+figure(70), title('MLDS Curves'), xlabel('Interpolation number'), ylabel('Scale value'), xlim([1 6])
+figure(71), title('Categorization Curves'), xlabel('Interpolation number'), ylabel('Frequency identified as object 2'), xlim([1 6])
+figure(72), title('Mu values'), xlabel('Mlds Mu value'), ylabel('Categorization Mu value'), xlim([2.5 4.5]), ylim([2.5 4.5]), plot([2.5 4.5], [2.5 4.5], 'k-')
+figure(73), title('Sigma values'), xlabel('Mlds sigma value'), ylabel('Categorization sigma value'), xlim([0 2]), ylim([0 2]), plot([0 6], [0 6], 'k-')
+figure(74), title('Sigma vs categorical index'), xlabel('MLDS categorical Index'), ylabel('MLDS sigma Value'), xlim([-0.1 0.8]), ylim([0 1.5]);
 
 
+save = 0;
+if save
+    for f = 70:73;                                                      
+    figure(f);
+    drawPublishAxis('labelFontSize=8','figSize=[6, 5]','lineWidth=0.5');
+    legend('off')
+    end
 
+    savepdf(figure(70),'~/Desktop/catFigs/comps/mldsCurves') 
+    savepdf(figure(71),'~/Desktop/catFigs/comps/catCurves')  
+    savepdf(figure(72),'~/Desktop/catFigs/comps/muValues') 
+    savepdf(figure(73),'~/Desktop/catFigs/comps/sigmaValues')    
 
+    figure, hold on, for k = 1:8, scatter(k,k,'markerFaceColor', colors(k,:), 'MarkerEdgeColor', 'w'), end
+end
 
 
 
@@ -227,6 +306,23 @@ legend([h1, h2, h3, h4, h5]);
 %%
 keyboard
 
+
+
+function labels = getLabels;
+
+labels{1} = [1 2 3 4]
+labels{2} = [1 2 3 4];
+labels{3} = [1 2 3 4];
+labels{4} = [5 6 7];
+labels{5} = [1 3 4];
+labels{6} = [1 3 4];
+% ADD S0611 HERE LATER labels{7} = [5 6 8];
+labels{7} = [5 1 8];
+labels{8} = [5 1 8];
+labels{9} = [1 3 4];
+labels{10} = [1 3 4];
+labels{11} = [1 8 4];
+labels{12} = [1 8 4]
 
 
 
