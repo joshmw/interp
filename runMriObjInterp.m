@@ -8,7 +8,7 @@ numSubs = size(subs,1)
 for sub = 1:numSubs
 
     %get the values
-    [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals, mldsRSM, categoryTaskRSM] = mriObjInterp(subs(sub,:));
+    [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, EVCRSMBoot, MVCRSMBoot, VVSRSMBoot, BigROIRSMBoot, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals, mldsRSM, categoryTaskRSM] = mriObjInterp(subs(sub,:));
 
     %save them
     brainCatVals{sub} = unaveragedBrainCatVals;
@@ -23,6 +23,10 @@ for sub = 1:numSubs
     MVCRSMs{sub} = MVCRSM;
     VVSRSMs{sub} = VVSRSM;
     BigROIRSMs{sub} = BigROIRSM;
+    EVCRSMBoots{sub} = EVCRSMBoot;
+    MVCRSMBoots{sub} = MVCRSMBoot;
+    VVSRSMBoots{sub} = VVSRSMBoot;
+    BigROIRSMBoots{sub} = BigROIRSMBoot;
     VVSDotProducts{sub} = VVSDotProduct;
     NNCatVals{sub} = unaveragedNNCatVals;
     NNR2Vals{sub} = unaveragedNNR2Vals;
@@ -37,6 +41,7 @@ labels = getLabels;
 numLabels = 8;
 %colors = [linspace(0,34,numLabels)', linspace(0,139,numLabels)', linspace(139,34,numLabels)'] / 255;
 colors = hsv(8);
+interpSets = {[1:6], [7:12], [13:18], [19:24]};
 %%
 
 keyboard
@@ -117,10 +122,39 @@ xlabel('Mlds categorical index'), ylabel('Brain categorical index'), title('Whol
 
 
 
+
 %% do "classification" with the brain data by comparing how close the endpoints are
+[allColors, vvsMldsGaussFits, vvsCatGaussFits] = plotPsychometricsFromRSMs(VVSRSMs, VVSRSMBoots, numSubs, colors, labels);
+[allColors, evcMldsGaussFits, evcCatGaussFits] = plotPsychometricsFromRSMs(EVCRSMs, EVCRSMBoots, numSubs, colors, labels);
 
-plotPsychometricsFromRSMs(VVSRSMs, numSubs)
 
+save = 0;
+if save
+    figure(83), drawPublishAxis('labelFontSize=8','figSize=[6, 5]','lineWidth=0.5', 'xtick=[1:6]'); legend('off')
+    savepdf(figure(83),'~/Desktop/catFigs/comps/brainMLDS')
+    figure(84), drawPublishAxis('labelFontSize=8','figSize=[6, 5]','lineWidth=0.5', 'xtick=[1:6]'); legend('off')
+    savepdf(figure(84),'~/Desktop/catFigs/comps/brainCategorization')
+end
+
+
+
+%% show the human brain RSMs
+plotHumanBrainRSMs(MVCRSMs, interpSets, colors, labels)
+
+
+
+%% plot brain reliability
+figure(60), hold on
+plotHumanBrainReliability(EVCRSMs, [0.2 0.7 0.3], -0.1)
+plotHumanBrainReliability(MVCRSMs, [0 0.15 0.85], 0)
+plotHumanBrainReliability(VVSRSMs, [0.7 0.3 1], 0.1)
+
+save = 0;
+if save
+    drawPublishAxis('labelFontSize=8','figSize=[12, 5]','lineWidth=0.5');
+    legend('off')
+    savepdf(figure(60),'~/Desktop/catFigs/comps/brainReliability')
+end
 
 
 
@@ -228,15 +262,6 @@ if save
 end
 
 
-%% show the human brain RSMs
-figure
-for sub = 1:length(VVSRSMs)
-    subplot(4,3,sub)
-    imagesc(VVSRSMs{sub}), colorbar, colormap('hot')
-end
-
-
-
 
 
 %% plot the behavioral data
@@ -247,28 +272,28 @@ for sub = 1:length(mldsRSMs)
         %get the mlds curve
         y = mldsRSMs{sub}(interpSets{interpSet},max(interpSets{interpSet}));
         x = 1:6;
-        mldsFit = fitCumulativeGaussian(x,y);
+        behaviorMldsGaussFits{sub}{interpSet} = fitCumulativeGaussian(x,y);
         %plot
         figure(70), hold on
-        plot(mldsFit.fitX, mldsFit.fitY, 'Color', [colors(labels{sub}(interpSet),:) 0.5]);
+        plot(behaviorMldsGaussFits{sub}{interpSet}.fitX, behaviorMldsGaussFits{sub}{interpSet}.fitY, 'Color', [colors(labels{sub}(interpSet),:) 0.5]);
 
         %categorization
         y = categoryTaskRSMs{sub}(interpSets{interpSet},max(interpSets{interpSet}));
         x = 1:6;
-        catFit = fitCumulativeGaussian(x,y);
+        behaviorCatGaussFits{sub}{interpSet} = fitCumulativeGaussian(x,y);
         %plot
         figure(71), hold on
-        plot(catFit.fitX, catFit.fitY, 'Color', [colors(labels{sub}(interpSet),:) 0.5]);
+        plot(behaviorCatGaussFits{sub}{interpSet}.fitX, behaviorCatGaussFits{sub}{interpSet}.fitY, 'Color', [colors(labels{sub}(interpSet),:) 0.5]);
 
         %scatters
         figure(72), hold on
-        scatter(mldsFit.mean, catFit.mean, [], colors(labels{sub}(interpSet),:), 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
+        scatter(behaviorMldsGaussFits{sub}{interpSet}.mean, behaviorCatGaussFits{sub}{interpSet}.mean, [], colors(labels{sub}(interpSet),:), 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
 
         figure(73), hold on
-        scatter(mldsFit.std, catFit.std, [], colors(labels{sub}(interpSet),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
+        scatter(behaviorMldsGaussFits{sub}{interpSet}.std, behaviorCatGaussFits{sub}{interpSet}.std, [], colors(labels{sub}(interpSet),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
         
         %mlds vs categorical index
-        figure(74), hold on, scatter(mldsCatVals(k), mldsFit.std, 'MarkerFaceColor', colors(labels{sub}(interpSet),:), 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w'), k = k+1;
+        figure(74), hold on, scatter(mldsCatVals(k), behaviorMldsGaussFits{sub}{interpSet}.std, 'MarkerFaceColor', colors(labels{sub}(interpSet),:), 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w'), k = k+1;
     end
 end
 
@@ -276,12 +301,12 @@ figure(70), title('MLDS Curves'), xlabel('Interpolation number'), ylabel('Scale 
 figure(71), title('Categorization Curves'), xlabel('Interpolation number'), ylabel('Frequency identified as object 2'), xlim([1 6])
 figure(72), title('Mu values'), xlabel('Mlds Mu value'), ylabel('Categorization Mu value'), xlim([2.5 4.5]), ylim([2.5 4.5]), plot([2.5 4.5], [2.5 4.5], 'k-')
 figure(73), title('Sigma values'), xlabel('Mlds sigma value'), ylabel('Categorization sigma value'), xlim([0 2]), ylim([0 2]), plot([0 6], [0 6], 'k-')
-figure(74), title('Sigma vs categorical index'), xlabel('MLDS categorical Index'), ylabel('MLDS sigma Value'), xlim([-0.1 0.8]), ylim([0 1.5]);
+figure(74), title('Sigma vs categorical index'), xlabel('MLDS categorical Index'), ylabel('MLDS sigma Value'), xlim([-0.2 0.8]), ylim([0.3 1.8]);
 
 
 save = 0;
 if save
-    for f = 70:73;                                                      
+    for f = 70:74;                                                      
     figure(f);
     drawPublishAxis('labelFontSize=8','figSize=[6, 5]','lineWidth=0.5');
     legend('off')
@@ -290,24 +315,134 @@ if save
     savepdf(figure(70),'~/Desktop/catFigs/comps/mldsCurves') 
     savepdf(figure(71),'~/Desktop/catFigs/comps/catCurves')  
     savepdf(figure(72),'~/Desktop/catFigs/comps/muValues') 
-    savepdf(figure(73),'~/Desktop/catFigs/comps/sigmaValues')    
+    savepdf(figure(73),'~/Desktop/catFigs/comps/sigmaValues') 
+    savepdf(figure(74),'~/Desktop/catFigs/comps/sigmaVsCatIndex')  
 
     figure, hold on, for k = 1:8, scatter(k,k,'markerFaceColor', colors(k,:), 'MarkerEdgeColor', 'w'), end
 end
 
 
+%% Do some comparisons between behavioral and brain data
+%compare brain cat/brain mlds means
+figure(90), hold on, xlabel('Brain MLDS Mean'), ylabel('Brain Cat Mean')
+x = []; y = [];
+for sub = 1:12
+    for set = 1:length(vvsMldsGaussFits{sub})
+        scatter(vvsMldsGaussFits{sub}{set}.mean, vvsCatGaussFits{sub}{set}.mean, [], colors(labels{sub}(set),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w');
+        x = [x vvsMldsGaussFits{sub}{set}.mean]; y = [y vvsCatGaussFits{sub}{set}.mean];
+    end
+end
+[r p] = corr(x',y')
+title(sprintf('Correlation: %0.2f, P-value: %0.3f', r, p));
+
+
+%compare mlds/brain mlds means
+figure(91), hold on, xlabel('Behavior MLDS Mean'), ylabel('Brain MLDS Mean')
+x = []; y = [];
+for sub = 1:12
+    for set = 1:length(behaviorMldsGaussFits{sub})
+        scatter(behaviorMldsGaussFits{sub}{set}.mean, vvsMldsGaussFits{sub}{set}.mean, [], colors(labels{sub}(set),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w');
+        x = [x behaviorMldsGaussFits{sub}{set}.mean]; y = [y vvsMldsGaussFits{sub}{set}.mean];
+    end
+end
+[r p] = corr(x',y')
+title(sprintf('Correlation: %0.2f, P-value: %0.3f', r, p));
+
+
+%compare behavior cat/brain cat mean
+figure(92), hold on, xlabel('Behavior Cat std'), ylabel('Brain Cat std')
+x = []; y = [];
+for sub = 1:12
+    for set = 1:length(behaviorCatGaussFits{sub})
+        scatter(behaviorCatGaussFits{sub}{set}.std, vvsCatGaussFits{sub}{set}.std, [], colors(labels{sub}(set),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w');
+        x = [x behaviorCatGaussFits{sub}{set}.std]; y = [y vvsCatGaussFits{sub}{set}.std];
+    end
+end
+[r p] = corr(x',y')
+title(sprintf('Correlation: %0.2f, P-value: %0.3f', r, p));
+xlim([0 2]), ylim([0 2]), plot([0 2], [0 2], 'k')
 
 
 
+%compare behavior mlds/brain mlds std
+figure(93), hold on, xlabel('Behavior MLDS Std'), ylabel('Brain MLDS Std')
+x = []; y = [];
+for sub = 1:12
+    for set = 1:length(behaviorMldsGaussFits{sub})
+        scatter(behaviorMldsGaussFits{sub}{set}.std, vvsMldsGaussFits{sub}{set}.std, [], colors(labels{sub}(set),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w');
+        x = [x behaviorMldsGaussFits{sub}{set}.std]; y = [y vvsMldsGaussFits{sub}{set}.std];
+    end
+end
+[r p] = corr(x',y')
+title(sprintf('Correlation: %0.2f, P-value: %0.3f', r, p));
+xlim([0 2]), ylim([0 2]), plot([0 2], [0 2], 'k')
+
+%compare behavior mlds/brain mlds std
+figure(94), hold on, xlabel('evc mlds std'), ylabel('vvs mlds std')
+x = []; y = [];
+for sub = 1:12
+    for set = 1:length(evcMldsGaussFits{sub})
+        scatter(evcMldsGaussFits{sub}{set}.std, vvsMldsGaussFits{sub}{set}.std, [], colors(labels{sub}(set),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w');
+        x = [x evcMldsGaussFits{sub}{set}.std]; y = [y vvsMldsGaussFits{sub}{set}.std];
+    end
+end
+[r p] = corr(x',y')
+title(sprintf('Correlation: %0.2f, P-value: %0.3f', r, p));
 
 
+%compare behavior mlds/brain cat mean
+figure(95), hold on, xlabel('Behavior cat Mean'), ylabel('Brain Cat Mean')
+x = []; y = [];
+for sub = 1:12
+    for set = 1:length(behaviorCatGaussFits{sub})
+        scatter(behaviorCatGaussFits{sub}{set}.mean, vvsCatGaussFits{sub}{set}.mean, [], colors(labels{sub}(set),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w');
+        x = [x behaviorCatGaussFits{sub}{set}.mean]; y = [y vvsCatGaussFits{sub}{set}.mean];
+    end
+end
+[r p] = corr(x',y')
+title(sprintf('Correlation: %0.2f, P-value: %0.3f', r, p));
 
 
 %%
+figure(96), hold on, xlim([0.5 4.5])
+m = []; mb = []; c = []; cb = []; usedColors = [];
+for sub = 1:12
+    for set = 1:length(behaviorCatGaussFits{sub})
+        m = [m behaviorMldsGaussFits{sub}{set}.std];
+        mb = [mb vvsMldsGaussFits{sub}{set}.std];
+        c = [c behaviorCatGaussFits{sub}{set}.std];
+        cb = [cb vvsCatGaussFits{sub}{set}.std];
+        usedColors = [usedColors; colors(labels{sub}(set),:)];
+    end
+end
+
+scatter(repmat(1,1,length(m)), m, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
+scatter(repmat(2,1,length(m)), mb, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
+scatter(repmat(3,1,length(m)), c, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
+scatter(repmat(4,1,length(m)), cb, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
+
+
+
+ylabel('Cumulative Gaussian sigma')
+title('')
+xticks([1 2 3 4])
+%xticklabels({'MLDS', 'Brain MLDS', 'Categorization', 'Brain categorization'})
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% END OF SCRIPT %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 keyboard
 
 
 
+
+
+%%%%%%%%%%%%%%%%%
+%% get labels %%%
+%%%%%%%%%%%%%%%%%%
 function labels = getLabels;
 
 labels{1} = [1 2 3 4]
@@ -316,62 +451,91 @@ labels{3} = [1 2 3 4];
 labels{4} = [5 6 7];
 labels{5} = [1 3 4];
 labels{6} = [1 3 4];
-% ADD S0611 HERE LATER labels{7} = [5 6 8];
-labels{7} = [5 1 8];
+labels{7} = [5 6 8];
 labels{8} = [5 1 8];
-labels{9} = [1 3 4];
+labels{9} = [5 1 8];
 labels{10} = [1 3 4];
-labels{11} = [1 8 4];
-labels{12} = [1 8 4]
+labels{11} = [1 3 4];
+labels{12} = [1 8 4];
+labels{13} = [1 8 4]
 
 
 
-%% 
-function plotPsychometricsFromRSMs(RSMs, numSubs)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% plotPsychometricsFromRSMs
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-figure
+function [allColors, vvsMldsGaussFits, vvsCatGaussFits] = plotPsychometricsFromRSMs(RSMs, RSMBoots, numSubs, colors, labels)
 
 interpSets = {[1:6], [7:12], [13:18], [19:24]};
 
-x = []; y = []; trueY = [];
+x = []; y = []; trueY = []; allColors = [];
 for sub = 1:numSubs
     for set = 1:length(RSMs{sub})/6
+
+        %clear bootstrap classification
+        bootDists = zeros(6,size(RSMBoots{sub},3));
+
+        %interp idexes
         low = min(interpSets{set}); high = max(interpSets{set});
         dists = RSMs{sub}(low:high,high) - RSMs{sub}(low:high,low);
 
-        subplot(1,3,1), hold on, plot([1 6], [0 0], '--k'), xlim([0.5, 6.5])
-        scatter(1:6, dists, 'k', 'filled', 'MarkerFaceAlpha', 0.2, 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w')
-        ylabel('Corr(interp,6) - Corr(interp, 1)'), xlabel('Interpolation point')
-        title('Relative distance to endpoints')
+        %plot unnormalized mlds
+        figure(80), hold on, plot([1 6], [0 0], '--k'), xlim([0.5, 6.5])
+        scatter(1:6, dists, [], colors(labels{sub}(set),:), 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
+        ylabel('Scale value'), xlabel('Interpolation number')
+        title('Brain MLDS')
 
-        subplot(1,3,2), hold on, ylim([0.8 2.2]), xlim([0.5, 6.5])
-        scatter(1:6, (dists>0)+1, 'k', 'filled', 'MarkerFaceAlpha', 0.1, 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w')
-        ylabel('Closest endpoint'), xlabel('Interpolation point')
-        title('Classification of interpolations')
-        x = [x 1:6]; y = [y dists>0]; trueY = [trueY dists];
+        %plot unbootstrapped classification
+        figure(81), hold on, xlim([0.5, 6.5])
+        scatter(1:6, (dists>0), [], colors(labels{sub}(set),:), 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
+        ylabel('Percent closest to endpoint 2'), xlabel('Interpolation number')
+        title('Brain Classification')
+        x = [x 1:6]; y = [y dists>0]; trueY = [trueY dists]; allColors = [allColors; repmat(colors(labels{sub}(set),:),6,1)];
+        
+        %normalize each curve individually
+        figure(83), hold on, xlabel('Interpolation number'), ylabel('Relative distance to endpoints'); title('Brain MLDS'), xlim([1 6])
+        normalizedDists = (dists - min(dists))/max(dists - min(dists));
+        vvsMldsGaussFits{sub}{set} = fitCumulativeGaussian([1:6],normalizedDists);
+        plot(vvsMldsGaussFits{sub}{set}.fitX, vvsMldsGaussFits{sub}{set}.fitY, 'color', [colors(labels{sub}(set),:) 0.5])
 
+        % do "classification" on the bootstraps
+        figure(84), hold on, xlabel('Interpolation number'), ylabel('Percent classified object 2'); title('Brain classification')
+        for boot = 1:size(RSMBoots{sub},3)
+            bootDists(:,boot) = RSMBoots{sub}(low:high,high,boot) - RSMBoots{sub}(low:high,low,boot);
+        end
+        numClassified2 = sum(bootDists'>0)/1000;
+        vvsCatGaussFits{sub}{set} = fitCumulativeGaussian([1:6], numClassified2);
+        plot(vvsCatGaussFits{sub}{set}.fitX, vvsCatGaussFits{sub}{set}.fitY, 'color', [colors(labels{sub}(set),:) 0.5])
+        xlim([1 6])
     end
 end
 
 %plot the medians
-subplot(1,3,1), scatter(1:6, mean(trueY,2), 48, 'cyan', 'filled')
-subplot(1,3,2), scatter(1:6, mean(y,2)+1, 48, 'cyan', 'filled')
+figure(80), scatter(1:6, mean(trueY,2), 60, [0 0 0], 'filled', 'MarkerEdgeColor', 'w')
+figure(81), scatter(1:6, mean(y,2), 60, [0 0 0], 'filled', 'markerEdgeColor', 'w')
 
 
 %normalize the correlation values between 0 and 1 so you can fit psychometrics
-subplot(1,3,3), hold on, ylim([-0.1 1.1]), xlim([-0.1 6.1]), title('Relative distance (normalized)')
+figure(82), hold on, title('Relative distance (normalized)')
 ylabel('Corr(interp,6) - Corr(interp, 1) (normalized)'), xlabel('Interpolation point')
 
+%scale the values to 0 1
 scaledTrueY = trueY;
-scaledTrueY = (scaledTrueY - min(min(scaledTrueY)))/(max(max(scaledTrueY)) - min(min(scaledTrueY)));
+scaledTrueY = (scaledTrueY - min(mean(trueY,2)))/(max(mean(trueY,2)) - min(mean(trueY,2)));
 
+%calculate threshold for calling something 1 vs 2
+threshold = (0 - min(mean(trueY,2)))/(max(mean(trueY,2)) - min(mean(trueY,2)));
+plot([1 6], [threshold threshold], 'Color', [0 0 0 0.5], 'LineStyle', '--')
+
+%plot psychometrics
 g = fitCumulativeGaussian(x,scaledTrueY(:)');
 plot(g.fitX,g.fitY, 'k'), hold on
-scatter(x, scaledTrueY(:), 'k', 'filled', 'MarkerFaceAlpha', 0.1, 'MarkerFaceColor', 'k', 'MarkerEdgeColor', 'w');
-scatter(1:6, mean(scaledTrueY,2), 48, 'cyan', 'filled')
+scatter(x, scaledTrueY(:), [], allColors, 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w');
+scatter(1:6, mean(scaledTrueY,2), 60, [0 0 0], 'filled')
 
 g2 = fitCumulativeGaussian(x,y(:)');
-subplot(1,3,2), plot(g2.fitX,g2.fitY+1, 'k')
+figure(81), plot(g2.fitX,g2.fitY, 'k')
 
 for interp = 1:6, choices(interp) = g.fitY(g.fitX == interp); end
 brainCatTaskMatrix = 1- dist(choices);
@@ -382,7 +546,66 @@ brainCatTaskMatrix = 1- dist(choices);
 
 
 
-%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% plotHumanRSMS %%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function plotHumanBrainRSMs(RSMs, interpSets, colors, labels, allColors)
+
+totalRSMs = 0;
+averageRSM = zeros(6);
+totalStimuliRSMs = zeros(1,8);
+stimuliRSMs = zeros(6,6,8);
+
+for sub = 1:length(RSMs)
+    for set = 1:length(RSMs{sub})/6
+
+        rsm = RSMs{sub}(interpSets{set}, interpSets{set});
+
+        averageRSM = averageRSM + rsm;
+
+        stimuliRSMs(:,:,labels{sub}(set)) = stimuliRSMs(:,:,labels{sub}(set)) + rsm;
+
+        totalRSMs = totalRSMs + 1;
+        totalStimuliRSMs(labels{sub}(set)) = totalStimuliRSMs(labels{sub}(set)) + 1;
+
+    end
+end
+
+%plot
+figure, imagesc(averageRSM/totalRSMs), colormap('hot'), colorbar
+figure, for k = 1:8, subplot(2,4,k), imagesc(stimuliRSMs(:,:,k)/totalStimuliRSMs(k)), colormap('hot'), end 
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%
+%% plot human rsm reliability %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function plotHumanBrainReliability(RSMs, c, offset)
+
+%plot reliability
+x = []; y = [];
+
+for sub = 1:length(RSMs)
+    x = [x repmat(sub,1,size(RSMs{sub},1))];
+    y = [y diag(RSMs{sub})'];
+end
+scatter(x+offset, y, 12, c, 'filled', 'markerFaceAlpha', 0.5, 'markerEdgeColor', 'w')
+plot([1 sub], [median(y) median(y)], 'color', c, 'LineStyle', '--')
+xlabel('Subject')
+ylabel('Split-half reliability of patterns')
+ylim([0 1]), xlim([0.5 length(RSMs) + 0.5]);
+
+
+
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% compareCatRSM 
+%%%%%%%%%%%%%%%%%%%%%%%%%
 function [catVals, r2s] = compareCatRSM(inputRSM, normalize)
 
 inputRSMs{1} = inputRSM;
