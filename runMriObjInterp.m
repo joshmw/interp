@@ -37,10 +37,13 @@ for sub = 1:numSubs
     close all
 end
 %%
+load('summaryDataMiniV1.mat');
 labels = getLabels;
 numLabels = 8;
 %colors = [linspace(0,34,numLabels)', linspace(0,139,numLabels)', linspace(139,34,numLabels)'] / 255;
 colors = hsv(8);
+%colors(3,:) = [0.8 1.0 0.4];
+colors(4,:) = [0.13 0.55 0.13];
 interpSets = {[1:6], [7:12], [13:18], [19:24]};
 %%
 
@@ -66,10 +69,10 @@ catTaskR2Vals = brainR2Vals(:,4);
 
 
 %% set cutoffs
-catTaskR2Cutoff = 0.9;
-mldsR2Cutoff = 0.8;
-brainR2Cutoff = 0.5; 
-NNR2Cutoff = 0.9;
+catTaskR2Cutoff = 0.7;
+mldsR2Cutoff = 0.7;
+brainR2Cutoff = 0.2; 
+NNR2Cutoff = 0.7;
 coneR2Cutoff = 0.8;
 
 
@@ -124,8 +127,8 @@ xlabel('Mlds categorical index'), ylabel('Brain categorical index'), title('Whol
 
 
 %% do "classification" with the brain data by comparing how close the endpoints are
-[allColors, vvsMldsGaussFits, vvsCatGaussFits] = plotPsychometricsFromRSMs(VVSRSMs, VVSRSMBoots, numSubs, colors, labels);
-[allColors, evcMldsGaussFits, evcCatGaussFits] = plotPsychometricsFromRSMs(EVCRSMs, EVCRSMBoots, numSubs, colors, labels);
+[allColors, allLabels, vvsMldsGaussFits, vvsCatGaussFits] = plotPsychometricsFromRSMs(VVSRSMs, VVSRSMBoots, numSubs, colors, labels);
+[allColors, allLabels, evcMldsGaussFits, evcCatGaussFits] = plotPsychometricsFromRSMs(EVCRSMs, EVCRSMBoots, numSubs, colors, labels);
 
 
 save = 0;
@@ -151,7 +154,7 @@ plotHumanBrainReliability(VVSRSMs, [0.7 0.3 1], 0.1)
 
 save = 0;
 if save
-    drawPublishAxis('labelFontSize=8','figSize=[12, 5]','lineWidth=0.5');
+    drawPublishAxis('labelFontSize=8','figSize=[12, 5]','lineWidth=0.5', 'xtick=[1 3 5 7 9 11 13]');
     legend('off')
     savepdf(figure(60),'~/Desktop/catFigs/comps/brainReliability')
 end
@@ -159,7 +162,7 @@ end
 
 
 %% Make the big plot
-figure, hold on, xlim([0.5 4.5]), ylim([-0.1 1.1])
+figure(100), hold on,
 
 
 % Initialize storage
@@ -169,92 +172,121 @@ filtered_brainCatVals = cell(1,3);
 filtered_mldsCatVals = [];
 filtered_coneCatVals = [];
 filtered_catTaskCatVals = [];
+orderedColors = allColors(1:6:end,:);
 
 % Plot the models and store values
-for model = 1:size(NNR2Vals,3)
-    for area = 1:4
-        temp_vals = [];
+for area = 1:4
+    all_models = [];
+    for model = 1:size(NNR2Vals,3)
+        temp_vals = []; tempColors = []; dupes = [100 100 100];
         for interp = 1:length(brainR2Vals)
-            if (NNR2Vals(interp, area, model) > NNR2Cutoff)
-                val = NNCatVals(interp, area, model);
-                scatter(area-0.1, val, 36, 'filled', 'MarkerFaceColor', [0.4660 0.6740 0.1880], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.2);
-                temp_vals(end+1) = val;
+            if sum(ismember(dupes,orderedColors(interp,:),'rows')) < 1
+                if (NNR2Vals(interp, area, model) > NNR2Cutoff)
+                    val = NNCatVals(interp, area, model);
+                    tempColors = [tempColors; orderedColors(interp,:)];
+                    temp_vals(end+1) = val;
+                    dupes = [dupes; orderedColors(interp,:)];
+                    all_models = [all_models val];
+                end
             end
         end
+        scatter(repmat(area-0.1,1,length(temp_vals)), temp_vals, 36, 'filled', 'CData', tempColors, 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'XJitter', 'randn', 'XJitterWidth', 0.15);
         filtered_NNCatVals{model, area} = temp_vals;
     end
+    scatter(area+0.1, mean(temp_vals), 72, 'black','filled', 'markerEdgeColor', 'w')
+    errorbar(area+0.1, mean(temp_vals), std(temp_vals), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
 end
+
+
 
 % Cornet model
 for area = 1:4
-    temp_vals = [];
+    temp_vals = []; tempColors = []; dupes = [100 100 100];
     for interp = 1:length(cornetR2Vals)
-        if (cornetR2Vals(interp, area) > NNR2Cutoff)
-            val = cornetCatVals(interp, area);
-            scatter(area-0.1, val, 36, 'filled', 'MarkerFaceColor', [0.4660 0.6740 0.1880], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.2);
-            temp_vals(end+1) = val;
+        if sum(ismember(dupes,orderedColors(interp,:),'rows')) < 1
+            if (cornetR2Vals(interp, area) > NNR2Cutoff)
+                val = cornetCatVals(interp, area);
+                tempColors = [tempColors; orderedColors(interp,:)];
+                temp_vals(end+1) = val;
+                dupes = [dupes; orderedColors(interp,:)];
+            end
         end
     end
+    scatter(repmat(area,1,length(temp_vals)), temp_vals, 36, 'filled', 'CData', tempColors, 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'XJitter', 'randn', 'XJitterWidth', 0.15);
     filtered_cornetCatVals{area} = temp_vals;
 end
+xticks(1:4), xticklabels({'Early', 'Middle', 'Late', 'Choice'}), xlabel('Network Layer')
+ylabel('Categorical index')
+title('Neural Network Representation Categoricalness')
+
+
+
+%figure(101), hold on, xlim([0.5 5.5]), ylim([-0.1 1.1])
 
 % Brain data
 for area = 1:3
-    temp_vals = [];
+    temp_vals = []; tempColors = [];
     for interp = 1:length(brainR2Vals)
         if (brainR2Vals(interp, area) > brainR2Cutoff) && ...
            (mldsR2Vals(interp) > mldsR2Cutoff) && ...
            (catTaskR2Vals(interp) > catTaskR2Cutoff)
             val = brainCatVals(interp, area);
-            scatter(area+0.1, val, 36, 'filled', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5);
+            tempColors = [tempColors; orderedColors(interp,:)];
             temp_vals(end+1) = val;
         end
     end
+    scatter(repmat(area+4-0.1,1,length(temp_vals)), temp_vals, 36, 'filled', 'CData', tempColors, 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'XJitter', 'randn', 'XJitterWidth', 0.15);
     filtered_brainCatVals{area} = temp_vals;
+    scatter(area+4+0.1, mean(temp_vals), 72, 'black','filled', 'markerEdgeColor', 'w')
+    errorbar(area+4+0.1, mean(temp_vals), std(temp_vals), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
 end
 
 % MLDS
+temp_vals = []; tempColors = [];
 for interp = 1:length(mldsR2Vals)
     if (mldsR2Vals(interp) > mldsR2Cutoff)
         val = mldsCatVals(interp);
-        scatter(4.1, val, 36, 'filled', 'MarkerFaceColor', [0 1 1], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5);
+        tempColors = [tempColors; orderedColors(interp,:)];
+        temp_vals(end+1) = val;
         filtered_mldsCatVals(end+1) = val;
     end
 end
+scatter(repmat(5+4-0.1,1,length(temp_vals)), temp_vals, 36, 'filled', 'CData', tempColors, 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'XJitter', 'randn', 'XJitterWidth', 0.15);
+scatter(5+4+0.1, mean(temp_vals), 72, 'black','filled', 'markerEdgeColor', 'w')
+errorbar(5+4+0.1, mean(temp_vals), std(temp_vals), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
 
-% CONES
-for interp = 1:length(coneR2Vals)
-    if (coneR2Vals(interp) > coneR2Cutoff)
-        val = coneCatVals(interp);
-        scatter(0.8, val, 36, 'filled', 'MarkerFaceColor', [1 0 0], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5);
-        filtered_coneCatVals(end+1) = val;
-    end
-end
+
+% % CONES
+% for interp = 1:length(coneR2Vals)
+%     if (coneR2Vals(interp) > coneR2Cutoff)
+%         val = coneCatVals(interp);
+%         scatter(0.8, val, 36, 'filled', 'MarkerFaceColor', orderedColors(interp,:), 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5);
+%         filtered_coneCatVals(end+1) = val;
+%     end
+% end
 
 
 % Categorization task
+temp_vals = []; tempColors = [];
 for interp = 1:length(catTaskR2Vals)
     if (catTaskR2Vals(interp) > catTaskR2Cutoff)
         val = catTaskCatVals(interp);
-        scatter(4.1, val, 36, 'filled', 'MarkerFaceColor', [1 0 1], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5);
+        tempColors = [tempColors; orderedColors(interp,:)];
+        temp_vals(end+1) = val;
         filtered_catTaskCatVals(end+1) = val;
     end
 end
+scatter(repmat(4+4-0.1,1,length(temp_vals)), temp_vals, 36, 'filled', 'CData', tempColors, 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'XJitter', 'randn', 'XJitterWidth', 0.2);
+scatter(4+4+0.1, mean(temp_vals), 72, 'black','filled', 'markerEdgeColor', 'w')
+errorbar(4+4+0.1, mean(temp_vals), std(temp_vals), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
+
 
 % Axis labels
-xticks(1:4), xticklabels({'Early', 'Middle', 'Late', 'Behavior'}), xlabel('ROI/Layer')
+%xticks(1:9), xticklabels({'Early', 'Middle', 'Late', 'Cat', 'Early', 'Middle', 'Late', 'Cat', 'MLDS Task'}), xlabel('Visual area/Behavioral task')
 ylabel('Categorical index')
-title('Categorical influence on RSM')
+title('Human Brain Representational/Behavioral Categoricalness')
 
-%legend
-h1 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', [0.4660 0.6740 0.1880], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'Neural network');
-h2 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'Brain');
-h3 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', [0 1 1], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'MLDS');
-h4 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', [1 0 1], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'Categorization task');
-h5 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', [1 0 0], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'Cone mosaic');
-legend([h1, h2, h3, h4, h5]);
-
-
+xlim([0.5 9.5]), ylim([-0.2 1.1])
 save = 0;
 if save
     drawPublishAxis('labelFontSize=8','figSize=[8, 7]','lineWidth=0.5');
@@ -307,9 +339,13 @@ figure(74), title('Sigma vs categorical index'), xlabel('MLDS categorical Index'
 save = 0;
 if save
     for f = 70:74;                                                      
-    figure(f);
-    drawPublishAxis('labelFontSize=8','figSize=[6, 5]','lineWidth=0.5');
-    legend('off')
+        figure(f);
+        if sum(f == [70 71])
+            drawPublishAxis('labelFontSize=8','figSize=[6, 5]','lineWidth=0.5', 'xtick=[1 2 3 4 5 6]');
+        else
+            drawPublishAxis('labelFontSize=8','figSize=[6, 5]','lineWidth=0.5'), end
+            
+        legend('off')
     end
 
     savepdf(figure(70),'~/Desktop/catFigs/comps/mldsCurves') 
@@ -406,7 +442,7 @@ title(sprintf('Correlation: %0.2f, P-value: %0.3f', r, p));
 %%
 figure(96), hold on, xlim([0.5 4.5])
 m = []; mb = []; c = []; cb = []; usedColors = [];
-for sub = 1:12
+for sub = 1:13
     for set = 1:length(behaviorCatGaussFits{sub})
         m = [m behaviorMldsGaussFits{sub}{set}.std];
         mb = [mb vvsMldsGaussFits{sub}{set}.std];
@@ -416,20 +452,33 @@ for sub = 1:12
     end
 end
 
-scatter(repmat(1,1,length(m)), m, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
-scatter(repmat(2,1,length(m)), mb, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
-scatter(repmat(3,1,length(m)), c, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
-scatter(repmat(4,1,length(m)), cb, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
+scatter(repmat(1-0.1,1,length(m)), m, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
+scatter(repmat(2-0.1,1,length(m)), mb, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
+scatter(repmat(3-0.1,1,length(m)), c, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
+scatter(repmat(4-0.1,1,length(m)), cb, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
 
 
 
 ylabel('Cumulative Gaussian sigma')
+xlim([0.5 4.5])
 title('')
 xticks([1 2 3 4])
+
+
+scatter(1.1, mean(m), 72, 'filled', 'MarkerFaceColor', [0 0 0], 'MarkerEdgeColor', 'w')
+errorbar(1.1, mean(m), std(m), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
+scatter(2.1, mean(mb), 72, 'filled', 'MarkerFaceColor', [0 0 0], 'MarkerEdgeColor', 'w')
+errorbar(2.1, mean(mb), std(mb), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
+scatter(3.1, mean(c), 72, 'filled', 'MarkerFaceColor', [0 0 0], 'MarkerEdgeColor', 'w')
+errorbar(3.1, mean(c), std(c), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
+scatter(4.1, mean(cb), 72, 'filled', 'MarkerFaceColor', [0 0 0], 'MarkerEdgeColor', 'w')
+errorbar(4.1, mean(cb), std(cb), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
 %xticklabels({'MLDS', 'Brain MLDS', 'Categorization', 'Brain categorization'})
 
-
-
+%drawPublishAxis('labelFontSize=8','figSize=[12, 12]','lineWidth=0.5');
+%legend('off')
+%savepdf(figure(96),'~/Desktop/catFigs/comps/stdComps')
+ 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% END OF SCRIPT %%
@@ -457,7 +506,7 @@ labels{9} = [5 1 8];
 labels{10} = [1 3 4];
 labels{11} = [1 3 4];
 labels{12} = [1 8 4];
-labels{13} = [1 8 4]
+labels{13} = [1 8 4];
 
 
 
@@ -465,11 +514,11 @@ labels{13} = [1 8 4]
 %% plotPsychometricsFromRSMs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [allColors, vvsMldsGaussFits, vvsCatGaussFits] = plotPsychometricsFromRSMs(RSMs, RSMBoots, numSubs, colors, labels)
+function [allColors, allLabels, vvsMldsGaussFits, vvsCatGaussFits] = plotPsychometricsFromRSMs(RSMs, RSMBoots, numSubs, colors, labels)
 
 interpSets = {[1:6], [7:12], [13:18], [19:24]};
 
-x = []; y = []; trueY = []; allColors = [];
+x = []; y = []; trueY = []; allColors = []; allLabels = []
 for sub = 1:numSubs
     for set = 1:length(RSMs{sub})/6
 
@@ -491,7 +540,9 @@ for sub = 1:numSubs
         scatter(1:6, (dists>0), [], colors(labels{sub}(set),:), 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
         ylabel('Percent closest to endpoint 2'), xlabel('Interpolation number')
         title('Brain Classification')
-        x = [x 1:6]; y = [y dists>0]; trueY = [trueY dists]; allColors = [allColors; repmat(colors(labels{sub}(set),:),6,1)];
+        x = [x 1:6]; y = [y dists>0]; trueY = [trueY dists];
+        allColors = [allColors; repmat(colors(labels{sub}(set),:),6,1)];
+        allLabels = [allLabels labels{sub}(set)];
         
         %normalize each curve individually
         figure(83), hold on, xlabel('Interpolation number'), ylabel('Relative distance to endpoints'); title('Brain MLDS'), xlim([1 6])
@@ -668,4 +719,119 @@ linearBeta = betas(2)/sum(betas);
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+% %% Make the big plot
+% figure, hold on, xlim([0.5 4.5]), ylim([-0.1 1.1])
+% 
+% 
+% % Initialize storage
+% filtered_NNCatVals = cell(size(NNR2Vals,3), 4);
+% filtered_cornetCatVals = cell(1,4);
+% filtered_brainCatVals = cell(1,3);
+% filtered_mldsCatVals = [];
+% filtered_coneCatVals = [];
+% filtered_catTaskCatVals = [];
+% 
+% % Plot the models and store values
+% for model = 1:size(NNR2Vals,3)
+%     for area = 1:4
+%         temp_vals = [];
+%         for interp = 1:length(brainR2Vals)
+%             if (NNR2Vals(interp, area, model) > NNR2Cutoff)
+%                 val = NNCatVals(interp, area, model);
+%                 scatter(area-0.1, val, 36, 'filled', 'MarkerFaceColor', [0.4660 0.6740 0.1880], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.2);
+%                 temp_vals(end+1) = val;
+%             end
+%         end
+%         filtered_NNCatVals{model, area} = temp_vals;
+%     end
+% end
+% 
+% % Cornet model
+% for area = 1:4
+%     temp_vals = [];
+%     for interp = 1:length(cornetR2Vals)
+%         if (cornetR2Vals(interp, area) > NNR2Cutoff)
+%             val = cornetCatVals(interp, area);
+%             scatter(area-0.1, val, 36, 'filled', 'MarkerFaceColor', [0.4660 0.6740 0.1880], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.2);
+%             temp_vals(end+1) = val;
+%         end
+%     end
+%     filtered_cornetCatVals{area} = temp_vals;
+% end
+% 
+% % Brain data
+% for area = 1:3
+%     temp_vals = [];
+%     for interp = 1:length(brainR2Vals)
+%         if (brainR2Vals(interp, area) > brainR2Cutoff) && ...
+%            (mldsR2Vals(interp) > mldsR2Cutoff) && ...
+%            (catTaskR2Vals(interp) > catTaskR2Cutoff)
+%             val = brainCatVals(interp, area);
+%             scatter(area+0.1, val, 36, 'filled', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5);
+%             temp_vals(end+1) = val;
+%         end
+%     end
+%     filtered_brainCatVals{area} = temp_vals;
+% end
+% 
+% % MLDS
+% for interp = 1:length(mldsR2Vals)
+%     if (mldsR2Vals(interp) > mldsR2Cutoff)
+%         val = mldsCatVals(interp);
+%         scatter(4.1, val, 36, 'filled', 'MarkerFaceColor', [0 1 1], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5);
+%         filtered_mldsCatVals(end+1) = val;
+%     end
+% end
+% 
+% % CONES
+% for interp = 1:length(coneR2Vals)
+%     if (coneR2Vals(interp) > coneR2Cutoff)
+%         val = coneCatVals(interp);
+%         scatter(0.8, val, 36, 'filled', 'MarkerFaceColor', [1 0 0], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5);
+%         filtered_coneCatVals(end+1) = val;
+%     end
+% end
+% 
+% 
+% % Categorization task
+% for interp = 1:length(catTaskR2Vals)
+%     if (catTaskR2Vals(interp) > catTaskR2Cutoff)
+%         val = catTaskCatVals(interp);
+%         scatter(4.1, val, 36, 'filled', 'MarkerFaceColor', [1 0 1], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5);
+%         filtered_catTaskCatVals(end+1) = val;
+%     end
+% end
+% 
+% % Axis labels
+% xticks(1:4), xticklabels({'Early', 'Middle', 'Late', 'Behavior'}), xlabel('ROI/Layer')
+% ylabel('Categorical index')
+% title('Categorical influence on RSM')
+% 
+% %legend
+% h1 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', [0.4660 0.6740 0.1880], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'Neural network');
+% h2 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'Brain');
+% h3 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', [0 1 1], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'MLDS');
+% h4 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', [1 0 1], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'Categorization task');
+% h5 = scatter(nan, nan, 36, 'filled', 'MarkerFaceColor', [1 0 0], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'DisplayName', 'Cone mosaic');
+% legend([h1, h2, h3, h4, h5]);
+% 
+% 
+% save = 0;
+% if save
+%     drawPublishAxis('labelFontSize=8','figSize=[8, 7]','lineWidth=0.5');
+%     savepdf(figure(2),'~/Desktop/catFigs/comps/bigFigure') ;
+% end
 
