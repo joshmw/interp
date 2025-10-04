@@ -1,45 +1,48 @@
 function runMriObjInterp
 
-%% first, get all the data
-subs = ['sub=s0605'; 'sub=s0606'; 'sub=s0607'; 'sub=s0608'; 'sub=s0609'; 'sub=s0610'; 'sub=s0612'; 'sub=s0613'; 'sub=s0614'; 'sub=s0615'; 'sub=s0616'; 'sub=s0617']
-%subs = ['sub=s0613'; 'sub=s0614'; 'sub=s0615'; 'sub=s0616'; 'sub=s0617']
-numSubs = size(subs,1)
+% %% first, get all the data
+% subs = ['sub=s0605'; 'sub=s0606'; 'sub=s0607'; 'sub=s0608'; 'sub=s0609'; 'sub=s0610'; 'sub=s0612'; 'sub=s0613'; 'sub=s0614'; 'sub=s0615'; 'sub=s0616'; 'sub=s0617']
+% %subs = ['sub=s0613'; 'sub=s0614'; 'sub=s0615'; 'sub=s0616'; 'sub=s0617']
+% numSubs = size(subs,1)
+% 
+% for sub = 1:numSubs
+% 
+%     %get the values
+%     [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, EVCRSMBoot, MVCRSMBoot, VVSRSMBoot, BigROIRSMBoot, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals, mldsRSM, categoryTaskRSM] = mriObjInterp(subs(sub,:));
+% 
+%     %save them
+%     brainCatVals{sub} = unaveragedBrainCatVals;
+%     brainR2Vals{sub} = unaveragedBrainR2Vals;
+%     cornetCatVals{sub} = unaveragedCornetCatVals;
+%     cornetR2Vals{sub} = unaveragedCornetR2Vals;
+%     mldsCatVals{sub} = unaveragedMldsCatVals;
+%     mldsR2Vals{sub} = unaveragedMldsR2Vals;
+%     bigRoiCatVals{sub} = unaveragedBigRoiCatVals;
+%     bigRoiR2Vals{sub} = unaveragedBigRoiR2Vals;
+%     EVCRSMs{sub} = EVCRSM;
+%     MVCRSMs{sub} = MVCRSM;
+%     VVSRSMs{sub} = VVSRSM;
+%     BigROIRSMs{sub} = BigROIRSM;
+%     EVCRSMBoots{sub} = EVCRSMBoot;
+%     MVCRSMBoots{sub} = MVCRSMBoot;
+%     VVSRSMBoots{sub} = VVSRSMBoot;
+%     BigROIRSMBoots{sub} = BigROIRSMBoot;
+%     VVSDotProducts{sub} = VVSDotProduct;
+%     NNCatVals{sub} = unaveragedNNCatVals;
+%     NNR2Vals{sub} = unaveragedNNR2Vals;
+%     coneCatVals{sub} = unaveragedConeCatVals;
+%     coneR2Vals{sub} = unaveragedConeR2Vals;
+%     mldsRSMs{sub} = mldsRSM;
+%     categoryTaskRSMs{sub} = categoryTaskRSM;
+%     close all
+% end
+% %%
 
-for sub = 1:numSubs
+load('~/Data/interp/summaryDataBensonv1v4BigVentral.mat');  noise = load('~/Data/interp/summaryDataV1V4NewVentral10000BootsShuffled.mat'); % all 8 areas
+%load('~/Data/interp/summaryDataBensonv1v4ObjectSelective.mat');  noise = load('~/Data/interp/summaryDataV1V4NewVentral10000BootsShuffled.mat'); % 4 ventral areas and LO, no FFA/PHA
+%load('~/Data/interp/summaryDataBensonv1v4LO123.mat');  noise = load('~/Data/interp/summaryDataV1V4NewVentral10000BootsShuffled.mat'); % just LO in high level
 
-    %get the values
-    [unaveragedBrainCatVals, unaveragedBrainR2Vals, unaveragedCornetCatVals, unaveragedCornetR2Vals, unaveragedMldsCatVals, unaveragedMldsR2Vals, unaveragedBigRoiCatVals, unaveragedBigRoiR2Vals, unaveragedNNCatVals, unaveragedNNR2Vals, EVCRSM, MVCRSM, VVSRSM, BigROIRSM, EVCRSMBoot, MVCRSMBoot, VVSRSMBoot, BigROIRSMBoot, VVSDotProduct, unaveragedConeCatVals, unaveragedConeR2Vals, mldsRSM, categoryTaskRSM] = mriObjInterp(subs(sub,:));
 
-    %save them
-    brainCatVals{sub} = unaveragedBrainCatVals;
-    brainR2Vals{sub} = unaveragedBrainR2Vals;
-    cornetCatVals{sub} = unaveragedCornetCatVals;
-    cornetR2Vals{sub} = unaveragedCornetR2Vals;
-    mldsCatVals{sub} = unaveragedMldsCatVals;
-    mldsR2Vals{sub} = unaveragedMldsR2Vals;
-    bigRoiCatVals{sub} = unaveragedBigRoiCatVals;
-    bigRoiR2Vals{sub} = unaveragedBigRoiR2Vals;
-    EVCRSMs{sub} = EVCRSM;
-    MVCRSMs{sub} = MVCRSM;
-    VVSRSMs{sub} = VVSRSM;
-    BigROIRSMs{sub} = BigROIRSM;
-    EVCRSMBoots{sub} = EVCRSMBoot;
-    MVCRSMBoots{sub} = MVCRSMBoot;
-    VVSRSMBoots{sub} = VVSRSMBoot;
-    BigROIRSMBoots{sub} = BigROIRSMBoot;
-    VVSDotProducts{sub} = VVSDotProduct;
-    NNCatVals{sub} = unaveragedNNCatVals;
-    NNR2Vals{sub} = unaveragedNNR2Vals;
-    coneCatVals{sub} = unaveragedConeCatVals;
-    coneR2Vals{sub} = unaveragedConeR2Vals;
-    mldsRSMs{sub} = mldsRSM;
-    categoryTaskRSMs{sub} = categoryTaskRSM;
-    close all
-end
-%%
-%load('summaryDataMiniV1.mat'); noise = load('~/Data/interp/noiseFloorMiniV1.mat');
-%load('summaryDataBenson10000Boots.mat'); noise = load('~/Data/interp/noiseFloorBenson100.mat');
-load('~/Data/interp/summaryDataV1V4NewVentral10000Boots.mat');  noise = load('~/Data/interp/noiseFloorBenson100.mat');
 labels = getLabels;
 numLabels = 8;
 %colors = [linspace(0,34,numLabels)', linspace(0,139,numLabels)', linspace(139,34,numLabels)'] / 255;
@@ -80,12 +83,37 @@ coneR2Cutoff = 0.8;
 
 
 
+%% plot the distribution of voxels from ROIs
+figure, matrix = zeros(24,13);
+for sub = 1:13;
+    roiNames = fieldnames(roiSubCounts{sub});
+    for roi = 1:length(roiNames);
+        matrix(roi, sub) = roiSubCounts{sub}.(roiNames{roi});
+%         bar(roi,roiSubCounts{sub}.(roiNames{roi}))
+%         totalVoxels = totalVoxels + roiSubCounts{sub}.(roiNames{roi});
+%         title(sprintf('Total voxels: %1.0i', totalVoxels))
+    end
+    
+end
+
+%bar(matrix,'stacked');
+bar(matrix(1:end/2,:) + matrix(end/2+1:end,:),'stacked');
+for k = 1:length(roiNames), roiNames{k} = roiNames{k}(4:end); end
+xticklabels(roiNames)
+colororder(hsv(13))  
+xlabel('Cortical area'), ylabel('Voxel count')
+title('Number of voxels in ventral partition, colored by subject')
+
+
+
+
+
 %% do "classification" with the brain data by comparing how close the endpoints are
 [allColors, allLabels, vvsMldsGaussFits, vvsCatGaussFits] = plotPsychometricsFromRSMs(VVSRSMs, VVSRSMBoots, numSubs, colors, labels);
 %[allColors, allLabels, evcMldsGaussFits, evcCatGaussFits] = plotPsychometricsFromRSMs(EVCRSMs, EVCRSMBoots, numSubs, colors, labels);
 
 
-save = 1;
+save = 0;
 if save
     figure(83), drawPublishAxis('labelFontSize=8','figSize=[6, 5]','lineWidth=0.5', 'xtick=[1:6]'); legend('off')
     savepdf(figure(83),'~/Desktop/catFigs/comps/brainMLDS')
@@ -96,7 +124,7 @@ end
 
 
 %% show the human brain RSMs
-plotHumanBrainRSMs(EVCRSMs, interpSets, colors, labels)
+plotHumanBrainRSMs(VVSRSMs, interpSets, colors, labels)
 
 
 
@@ -146,8 +174,9 @@ for area = 1:4
         scatter(repmat(area-0.1,1,length(temp_vals)), temp_vals, 36, 'filled', 'CData', tempColors, 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5, 'XJitter', 'randn', 'XJitterWidth', 0.15);
         filtered_NNCatVals{model, area} = temp_vals;
     end
-    scatter(area+0.1, mean(temp_vals), 72, 'black','filled', 'markerEdgeColor', 'w')
-    errorbar(area+0.1, mean(temp_vals), std(temp_vals), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
+    scatter(area+0.1, mean(all_models), 72, 'black','filled', 'markerEdgeColor', 'w')
+    errorbar(area+0.1, mean(all_models), std(all_models), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'CapSize', 0, 'LineWidth', 1)
+    sprintf('Model categorical indices - area: %0.2f, mean: %0.2f, std: %0.2f', area, mean(all_models), std(all_models))
 end
 
 
@@ -240,7 +269,7 @@ ylabel('Categorical index')
 title('Human Brain Representational/Behavioral Categoricalness')
 
 xlim([0.5 9.5]), ylim([-0.2 1.1])
-save = 1;
+save = 0;
 if save
     drawPublishAxis('labelFontSize=8','figSize=[20, 8]','lineWidth=0.5'); legend('off')
     savepdf(figure(100),'~/Desktop/catFigs/comps/bigFigure') ;
@@ -253,6 +282,8 @@ end
 interpSets = {[1:6], [7:12], [13:18], [19:24]};
 k=1;
 behavioral_r2_cutoff = 0.7;
+mldsMeans = []; catMeans = [];
+mldsSigmas = []; catSigmas = [];
 for sub = 1:length(mldsRSMs)
     for interpSet = 1:length(mldsRSMs{sub})/6
 
@@ -278,9 +309,11 @@ for sub = 1:length(mldsRSMs)
         %scatters
         figure(72), hold on
         scatter(behaviorMldsGaussFits{sub}{interpSet}.mean, behaviorCatGaussFits{sub}{interpSet}.mean, [], colors(labels{sub}(interpSet),:), 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
+        catMeans = [catMeans behaviorCatGaussFits{sub}{interpSet}.mean]; mldsMeans = [mldsMeans behaviorMldsGaussFits{sub}{interpSet}.mean];
 
         figure(73), hold on
         scatter(behaviorMldsGaussFits{sub}{interpSet}.std, behaviorCatGaussFits{sub}{interpSet}.std, [], colors(labels{sub}(interpSet),:), 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
+        catSigmas = [catSigmas behaviorCatGaussFits{sub}{interpSet}.std]; mldsSigmas = [mldsSigmas behaviorMldsGaussFits{sub}{interpSet}.std];
         
         %mlds vs categorical index
         if (behaviorMldsGaussFits{sub}{interpSet}.r2 > behavioral_r2_cutoff) & (mldsR2Vals(k) > mldsR2Cutoff)
@@ -326,15 +359,21 @@ end
 figure(96), hold on, xlim([0.5 4.5])
 behavioral_r2_cutoff = 0.8;
 
-m = []; mb = []; c = []; cb = []; usedColors = [];
+m = []; mb = []; c = []; cb = []; 
+mMu= []; mbMu = []; cMu = []; cbMu = []; 
+usedColors = [];
 for sub = 1:13
     for set = 1:length(behaviorCatGaussFits{sub})
-        vvsCatGaussFits{sub}{set}.r2
+        vvsCatGaussFits{sub}{set}.r2;
         if (behaviorMldsGaussFits{sub}{set}.r2 > behavioral_r2_cutoff) & (behaviorCatGaussFits{sub}{set}.r2 > behavioral_r2_cutoff) & (vvsMldsGaussFits{sub}{set}.r2 > behavioral_r2_cutoff) & (vvsCatGaussFits{sub}{set}.r2 > behavioral_r2_cutoff)
             m = [m behaviorMldsGaussFits{sub}{set}.std];
             mb = [mb vvsMldsGaussFits{sub}{set}.std];
             c = [c behaviorCatGaussFits{sub}{set}.std];
             cb = [cb vvsCatGaussFits{sub}{set}.std];
+            mMu = [mMu behaviorMldsGaussFits{sub}{set}.mean];
+            mbMu = [mbMu vvsMldsGaussFits{sub}{set}.mean];
+            cMu = [cMu behaviorCatGaussFits{sub}{set}.mean];
+            cbMu = [cbMu vvsCatGaussFits{sub}{set}.mean];
             usedColors = [usedColors; colors(labels{sub}(set),:)];
         end
     end
@@ -364,24 +403,216 @@ errorbar(4.1, mean(cb), std(cb), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'C
 %xticklabels({'MLDS', 'Brain MLDS', 'Categorization', 'Brain categorization'})
 
 
-drawPublishAxis('labelFontSize=8','figSize=[11, 9]','lineWidth=0.5');
-legend('off')
-savepdf(figure(96),'~/Desktop/catFigs/comps/stdComps')
+sprintf('(Linking model Data) MLDS Mean: %0.2f Sigma: %0.2f)',mean(mb), std(mb))
+sprintf('(Linking model Data) Categorization Mean: %0.2f Sigma: %0.2f)',mean(cb), std(cb))
+[r p] = ttest(m,c)
+%drawPublishAxis('labelFontSize=8','figSize=[11, 9]','lineWidth=0.5');
+%legend('off')
+%savepdf(figure(96),'~/Desktop/catFigs/comps/stdComps')
  
 
 
+%% calculate shuffled R2 for categorical indices
+[EVCshuffledCatVals, EVCshuffledr2s] = computeCategoricalIndices(noise.EVCRSMBoots, true, 1000);
+[MVCshuffledCatVals, MVCshuffledr2s] = computeCategoricalIndices(noise.MVCRSMBoots, true, 1000);
+[VVSshuffledCatVals, VVSshuffledr2s] = computeCategoricalIndices(noise.VVSRSMBoots, true, 1000);
 
-%% NUMBERS
-getDistances(MVCRSMs, interpSets)
+figure, hold on, xlim([0 1]), ylim([0 1]), plot([0 1], [0 1], 'k')
+scatter(mean(EVCshuffledr2s,1), brainR2Vals(:,1), 'filled', 'MarkerFaceColor', [0.2 0.7 0.3], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5)
+scatter(mean(MVCshuffledr2s,1), brainR2Vals(:,2), 'filled', 'MarkerFaceColor', [0 0.15 0.85], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5)
+scatter(mean(VVSshuffledr2s,1), brainR2Vals(:,3), 'filled', 'MarkerFaceColor', [0.7 0.3 1], 'MarkerEdgeColor', 'w', 'MarkerFaceAlpha', 0.5)
+
+xlabel('Shuffled categorical index fit R2'), ylabel('Unshuffled categorical index fit R2'), title('Categorical index R2s')
+
+
+%% rsm distances - SECTION 4%%
+getDistances(VVSRSMs, interpSets),
 
 
 
 
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% STATISTICAL TESTS AND SUMMARY NUMBERS %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% FIGURE 2 Task-dependent human perceptual geometry -- behavioral tests
+sprintf('(Behavioral Data) MLDS Sigma Mean: %0.2f Sigma: %0.2f)', mean(m), std(m))
+sprintf('(Behavioral Data) Categorization Sigma Mean: %0.2f Sigma: %0.2f)',mean(c), std(c))
+[r p] = ttest(m,c,'tail','right');
+sprintf('1-tailed paired t-test between mlds and categorization behavior sigmas: %0.2i', p)
+
+
+%% FIGURE 3 - NEURAL NETWORK GEOMETRY
+nnearly = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,1), 'UniformOutput', false));
+nnmid = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,2), 'UniformOutput', false));
+nnlate = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,3), 'UniformOutput', false));
+nnchoice = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,4), 'UniformOutput', false));
+
+sprintf('Early network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnearly), std(nnearly))
+sprintf('Middle network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnmid), std(nnmid))
+sprintf('Late network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnlate), std(nnlate))
+sprintf('Choice network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnchoice), std(nnchoice))
+
+
+%% FIGURE 4 - CORTICAL GEOMETRY
+
+
+
+
+
+
+
+%% The v4 thing... %%
+[bin ind] = ismember(filtered_brainCatVals{2},brainCatVals(:,2)');                             
+figure, scatter(mldsCatVals(ind), brainCatVals(ind,2), 'filled', 'CData', orderedColors(ind,:))
+xlabel('Mlds categorical index')
+ylabel('V4 categorical index')
+[r p] = corr(mldsCatVals(ind), brainCatVals(ind,2))                                            
+
+
+
+%%
+[catVals, r2s] = computeCategoricalIndices(VVSRSMBoots, true, 100);
+size(catVals);
+
+
+
+
+
+
+keyboard
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% END OF SCRIPT %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 keyboard
+
+
+
+
+function [catVals, r2s] = computeCategoricalIndices(RSMs, normalize, nBoots)
+% computeCategoricalIndicesFlexible
+% Works for both single-RSM and bootstrapped RSM data.
+%
+% INPUT:
+%   RSMs      - 1×N cell array (each [18×18], [24×24], [18×18×B], or [24×24×B])
+%   normalize - (bool) normalize each 6×6 block (default: true)
+%   nBoots    - (int) number of bootstraps to use (default: all if bootstraps exist)
+%
+% OUTPUT:
+%   catVals   - matrix [nBoots × totalBlocks]
+%   r2s       - matrix [nBoots × totalBlocks]
+
+if nargin < 2
+    normalize = true;
+end
+
+isBootstrap = ndims(RSMs{1}) == 3;
+
+% figure out how many bootstraps to use
+if isBootstrap
+    totalBoots = size(RSMs{1}, 3);
+    if nargin < 3 || isempty(nBoots)
+        nBoots = totalBoots;
+    elseif nBoots > totalBoots
+        error('Requested %d bootstraps but only %d available.', nBoots, totalBoots);
+    end
+else
+    nBoots = 1; % treat single-RSM case as 1 "bootstrap"
+end
+
+% First pass: count total number of 6×6 blocks
+totalBlocks = 0;
+for subj = 1:length(RSMs)
+    sz = size(RSMs{subj}, 1);
+    if sz == 18 || sz == 24
+        totalBlocks = totalBlocks + sz / 6;
+    end
+end
+
+% Preallocate final output matrices
+catVals = zeros(nBoots, totalBlocks);
+r2s     = zeros(nBoots, totalBlocks);
+
+% define null hypothesis matrices
+categoricalRSMCovar = [ones(3) zeros(3); zeros(3) ones(3)];
+linearRSMCovar = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
+
+col = 1; % track which column we’re filling
+
+for subj = 1:length(RSMs)
+    subjRSM = RSMs{subj};
+    sz = size(subjRSM, 1);
+
+    if sz ~= 18 && sz ~= 24
+        warning('Skipping subject %d: unexpected size %dx%d', subj, sz, sz);
+        continue
+    end
+
+    nBlocks = sz / 6;
+
+    for block = 1:nBlocks
+        idx = (1:6) + (block-1)*6;
+
+        for b = 1:nBoots
+            if isBootstrap
+                inputRSM = subjRSM(idx, idx, b);
+            else
+                inputRSM = subjRSM(idx, idx);
+            end
+
+            % Normalize if requested
+            if normalize
+                inputRSM = (inputRSM - min(inputRSM(:))) / (max(inputRSM(:)) - min(inputRSM(:)));
+            end
+
+            % Compute variance scaling
+            inputVar = sqrt(diag(inputRSM));
+            varMatrix = inputVar * inputVar';
+            linearRSM = varMatrix .* linearRSMCovar;
+            categoricalRSM = varMatrix .* categoricalRSMCovar;
+
+            % Fit categorical and linear components
+            [categoricalBeta, linearBeta, r2] = fitRSMComponents(inputRSM, categoricalRSM, linearRSM);
+
+            catVals(b, col) = categoricalBeta / (categoricalBeta + linearBeta);
+            r2s(b, col)     = r2;
+        end
+
+        col = col + 1; % next column for next block
+    end
+end
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Helper: fitRSMComponents
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+function [categoricalBeta, linearBeta, r2] = fitRSMComponents(inputRSM, categoricalRSM, linearRSM)
+
+mask = ~eye(size(inputRSM)); % ignore diagonal
+
+objective = @(betas) sum(sum((inputRSM(mask) - ...
+    (betas(1) * categoricalRSM(mask) + betas(2) * linearRSM(mask))).^2));
+
+betas = fminsearch(objective, [0.5, 0.5]);
+
+categoricalBeta = betas(1) / sum(betas);
+linearBeta = betas(2) / sum(betas);
+
+fitRSM = categoricalRSM * betas(1) + linearRSM * betas(2);
+r = corr(fitRSM(mask), inputRSM(mask));
+r2 = r^2;
+
+
+
 
 
 
@@ -394,14 +625,18 @@ diagonal = [];
 corner = [];
 for sub = 1:length(RSMs)
     for interpSet = 1:length(RSMs{sub})/6
-        diagonal = [diagonal RSMs{sub}(interpSets{interpSet}(1), interpSets{interpSet}(1))];
+        diagonal = [diagonal RSMs{sub}(interpSets{interpSet}(1), interpSets{interpSet}(1)) RSMs{sub}(interpSets{interpSet}(6), interpSets{interpSet}(6))];
         corner = [corner RSMs{sub}(interpSets{interpSet}(1), interpSets{interpSet}(6))];
     end
 end
 
 sprintf('Same stimulus correlation - mean: %1.4f, std: %0.4f', mean(diagonal), std(diagonal))
 sprintf('Different stimulus correlation - mean: %1.4f, std: %0.4f', mean(corner), std(corner))
+figure, scatter(diagonal(1:2:end), corner, 'filled', 'k'), xlabel('split-half reliability'), ylabel('correlation to other endpoint'), hold on
+scatter(diagonal(2:2:end), corner, 'filled', 'k'), xlabel('split-half reliability'), ylabel('correlation to other endpoint')
+ylim([-.5 1]), xlim([-.5 1]), hold on, plot([-0.5 1], [-0.5 1])
 
+[r p] = ttest2(diagonal, corner)
 
 
 
@@ -476,7 +711,7 @@ for sub = 1:numSubs
         for boot = 1:size(RSMBoots{sub},3)
             bootDists(:,boot) = RSMBoots{sub}(low:high,high,boot) - RSMBoots{sub}(low:high,low,boot);
         end
-        numClassified2 = sum(bootDists'>0)/1000;
+        numClassified2 = sum(bootDists'>0)/10000;
         vvsCatGaussFits{sub}{set} = fitCumulativeGaussian([1:6], numClassified2);
         if (vvsCatGaussFits{sub}{set}.r2 > behavioral_r2_cutoff);
             plot(vvsCatGaussFits{sub}{set}.fitX, vvsCatGaussFits{sub}{set}.fitY, 'color', [colors(labels{sub}(set),:) 0.5])
@@ -512,8 +747,8 @@ g2 = fitCumulativeGaussian(x,y(:)');
 figure(81), plot(g2.fitX,g2.fitY, 'k')
 
 for interp = 1:6, choices(interp) = g.fitY(g.fitX == interp); end
-brainCatTaskMatrix = 1- dist(choices);
-[c r] = compareCatRSM(brainCatTaskMatrix, 1);
+%brainCatTaskMatrix = 1- dist(choices);
+%[c r] = compareCatRSM(brainCatTaskMatrix, 1);
 
 
 
@@ -581,68 +816,6 @@ scatter(y, ynoise, 12, c, 'filled', 'markerFaceAlpha', 0.5, 'markerEdgeColor', '
 
 
 
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-%% compareCatRSM 
-%%%%%%%%%%%%%%%%%%%%%%%%%
-function [catVals, r2s] = compareCatRSM(inputRSM, normalize)
-
-inputRSMs{1} = inputRSM;
-
-%init empty array
-catVals = [];
-r2s = [];
-% create the 2 null hypothesis matrices
-categoricalRSMCovar = [ones(3) zeros(3); zeros(3) ones(3)];
-linearRSMCovar = max(0, 1 - 0.2 * abs((1:6)' - (1:6)));
-
-for inputNum = 1:length(inputRSMs)
-    %get the RSM
-    inputRSM = inputRSMs{inputNum};
-    %if not already normalized, normalize (unaveraged RSMs aren't normalized)
-    if normalize
-        inputRSM = (inputRSM - min(inputRSM(:))) / (max(inputRSM(:)) - min(inputRSM(:)));
-    end
-    %compute the idealized matrices based on measured variance
-    inputVar = sqrt(diag(inputRSM));
-    varMatrix = inputVar*inputVar';
-    linearRSM = varMatrix .* linearRSMCovar;
-    categoricalRSM = varMatrix .* categoricalRSMCovar;
-    
-    %find betas that describe input of linear/categorical matrices to observed matrix
-    [categoricalBeta, linearBeta, r2] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM, inputNum);
-    catVals = [catVals categoricalBeta / (categoricalBeta + linearBeta)];
-    r2s = [r2s r2];
-
-end
-
-
-
-%%%%%%%%%%%%%%%%%%
-%% findCatLinearEvidence %%
-%%%%%%%%%%%%%%%%%%%%%
-function [categoricalBeta, linearBeta, r2] = findCatLinearEvidence(inputRSM, categoricalRSM, linearRSM, inputNum)
-
-%mask to ignore diagonal - it's the same between both conditions but might cause a shitty fit in the neural networks
-mask = ~eye(size(inputRSM));
-
-%define the objective function to minimize absolute difference
-objective = @(betas) sum(sum(abs(inputRSM(mask) - ...
-    (betas(1) * categoricalRSM(mask) + betas(2) * linearRSM(mask))).^2));
-
-% Optimize Betas using fminsearch
-betas = fminsearch(objective, [.5, .5]); % Initial guesses for Betas
-
-
-%r-squared of the fit matrix
-fitRSM = categoricalRSM * betas(1) + linearRSM * betas(2);
-r2 = corr(fitRSM(~eye(size(fitRSM))), inputRSM(~eye(size(inputRSM))))^2;
-
-categoricalBeta = betas(1)/sum(betas);
-linearBeta = betas(2)/sum(betas);
 
 
 
