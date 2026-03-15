@@ -40,6 +40,8 @@ function runMriObjInterp
 
 load('~/Data/interp/summaryDataBensonv1v4BigVentral.mat');  noise = load('~/Data/interp/summaryDataV1V4NewVentral10000BootsShuffled.mat'); % all 8 areas
 %load('~/Data/interp/summaryDataBensonv1v4ObjectSelective.mat');  noise = load('~/Data/interp/summaryDataV1V4NewVentral10000BootsShuffled.mat'); % 4 ventral areas and LO, no FFA/PHA
+%load('~/Data/interp/summaryDataBensonv1v4smallVentral.mat');  noise = load('~/Data/interp/summaryDataV1V4NewVentral10000BootsShuffled.mat'); % 4 ventral areas with no LO
+%load('~/Data/interp/summaryDataBensonv1v4CategorySelective.mat');  noise = load('~/Data/interp/summaryDataV1V4NewVentral10000BootsShuffled.mat'); % FFA, PHA, and PH
 %load('~/Data/interp/summaryDataBensonv1v4LO123.mat');  noise = load('~/Data/interp/summaryDataV1V4NewVentral10000BootsShuffled.mat'); % just LO in high level
 
 
@@ -52,7 +54,6 @@ colors(4,:) = [0.13 0.55 0.13];
 interpSets = {[1:6], [7:12], [13:18], [19:24]};
 %%
 
-keyboard
 
 
 %% sort the data to be usable - get out of cells
@@ -104,10 +105,6 @@ colororder(hsv(13))
 xlabel('Cortical area'), ylabel('Voxel count')
 title('Number of voxels in ventral partition, colored by subject')
 
-
-
-
-
 %% do "classification" with the brain data by comparing how close the endpoints are
 [allColors, allLabels, vvsMldsGaussFits, vvsCatGaussFits] = plotPsychometricsFromRSMs(VVSRSMs, VVSRSMBoots, numSubs, colors, labels);
 %[allColors, allLabels, evcMldsGaussFits, evcCatGaussFits] = plotPsychometricsFromRSMs(EVCRSMs, EVCRSMBoots, numSubs, colors, labels);
@@ -124,7 +121,7 @@ end
 
 
 %% show the human brain RSMs
-plotHumanBrainRSMs(VVSRSMs, interpSets, colors, labels)
+plotHumanBrainRSMs(MVCRSMs, interpSets, colors, labels)
 
 
 
@@ -135,12 +132,11 @@ plotHumanBrainReliability(VVSRSMs, noise.VVSRSMBoots, [0.7 0.3 1], 0.1)
 
 save = 0;
 if save
+    figure(60)
     drawPublishAxis('labelFontSize=8','figSize=[12, 5]','lineWidth=0.5', 'xtick=[1 3 5 7 9 11 13]');
     legend('off')
     savepdf(figure(60),'~/Desktop/catFigs/comps/brainReliability')
 end
-
-
 
 %% Make the big plot
 figure(100), hold on,
@@ -272,7 +268,7 @@ xlim([0.5 9.5]), ylim([-0.2 1.1])
 save = 0;
 if save
     drawPublishAxis('labelFontSize=8','figSize=[20, 8]','lineWidth=0.5'); legend('off')
-    savepdf(figure(100),'~/Desktop/catFigs/comps/bigFigure') ;
+    savepdf(figure(100),'~/Desktop/catFigs/comps/objectSelectiveFigure') ;
 end
 
 
@@ -384,8 +380,6 @@ scatter(repmat(2-0.1,1,length(m)), mb, [], usedColors, 'filled','MarkerFaceAlpha
 scatter(repmat(3-0.1,1,length(m)), c, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
 scatter(repmat(4-0.1,1,length(m)), cb, [], usedColors, 'filled','MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w', 'XJitter', 'randn', 'XJitterWidth', 0.2);
 
-
-
 ylabel('Cumulative Gaussian sigma')
 xlim([0.5 4.5]), ylim([0 2])
 title('')
@@ -406,11 +400,17 @@ errorbar(4.1, mean(cb), std(cb), 'LineStyle', 'none', 'Color', [0.5 0.5 0.5], 'C
 sprintf('(Linking model Data) MLDS Mean: %0.2f Sigma: %0.2f)',mean(mb), std(mb))
 sprintf('(Linking model Data) Categorization Mean: %0.2f Sigma: %0.2f)',mean(cb), std(cb))
 [r p] = ttest(m,c)
-%drawPublishAxis('labelFontSize=8','figSize=[11, 9]','lineWidth=0.5');
-%legend('off')
-%savepdf(figure(96),'~/Desktop/catFigs/comps/stdComps')
+save = 0;
+if save
+    drawPublishAxis('labelFontSize=8','figSize=[11, 9]','lineWidth=0.5');
+    legend('off')
+    savepdf(figure(96),'~/Desktop/catFigs/comps/stdComps')
+end
  
 
+
+
+keyboard
 
 %% calculate shuffled R2 for categorical indices
 [EVCshuffledCatVals, EVCshuffledr2s] = computeCategoricalIndices(noise.EVCRSMBoots, true, 1000);
@@ -424,6 +424,19 @@ scatter(mean(VVSshuffledr2s,1), brainR2Vals(:,3), 'filled', 'MarkerFaceColor', [
 
 xlabel('Shuffled categorical index fit R2'), ylabel('Unshuffled categorical index fit R2'), title('Categorical index R2s')
 
+%%
+
+figure, hist(EVCshuffledCatVals(:),50)
+title('Categorical index values from shuffle image labels')
+xlabel('Categorical index'), ylabel('Count')
+
+figure, hist(EVCshuffledr2s(:),50)
+title('Categorical index r2s from shuffle image labels')
+xlabel('r-squared'), ylabel('Count')
+                    
+figure, scatter(MVCshuffledr2s(:), MVCshuffledCatVals(:), 10, 'k', 'filled', 'markerFaceAlpha', 0.1);
+title('r-squared vs categorical index for shuffle RSMs')
+xlabel('r-squared'), ylabel('Categorical index')
 
 %% rsm distances - SECTION 4%%
 getDistances(VVSRSMs, interpSets),
@@ -438,11 +451,37 @@ getDistances(VVSRSMs, interpSets),
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-%% FIGURE 2 Task-dependent human perceptual geometry -- behavioral tests
-sprintf('(Behavioral Data) MLDS Sigma Mean: %0.2f Sigma: %0.2f)', mean(m), std(m))
-sprintf('(Behavioral Data) Categorization Sigma Mean: %0.2f Sigma: %0.2f)',mean(c), std(c))
+%% SECTION 2 Task-dependent human perceptual geometry -- behavioral tests
+sprintf('(Behavioral Data) MLDS Sigma Mean: %0.3f Sigma: %0.3f)', mean(m), std(m))
+sprintf('(Behavioral Data) Categorization Sigma Mean: %0.3f Sigma: %0.3f)',mean(c), std(c))
 [r p] = ttest(m,c,'tail','right');
-sprintf('1-tailed paired t-test between mlds and categorization behavior sigmas: %0.2i', p)
+sprintf('1-tailed paired t-test between mlds and categorization behavior sigmas: %0.3i', p)
+[r p] = ttest(m,1.57,'tail','left');
+sprintf('1-tailed paired t-test between mlds and linear (1.57) sigmas: %0.3i', p)
+
+
+% %% FIGURE 3 - CORTICAL GEOMETRY
+
+%plot pvalues as a matrix
+clear gca
+D=[filtered_brainCatVals(1:3),{filtered_mldsCatVals},{filtered_catTaskCatVals}]; P=ones(5);
+for i=1:5,for j=i+1:5,[~,P(i,j)]=ttest2(D{i},D{j});P(j,i)=P(i,j);end,end
+figure;imagesc(-log10(P));colormap([.9 .9 .9;.6 .9 .6;.2 .7 .2;0 .5 0]);caxis([0 4]);
+xticks(1:5);xticklabels({'Early','Middle','Late','distance','categorization'});yticks(1:5);yticklabels({'Early','Middle','Late','distance','categorization'});
+for i=1:5,for j=1:5,if i~=j,text(j,i,num2str(P(i,j),'%.3f'),'HorizontalAlignment','center');end,end,end
+colorbar('Ticks',[.5 1.5 2.5 3.5],'TickLabels',{'ns','<.05','<.01','<.001'});
+title('Pairwise p-value (difference between categorical indices, 2-sided t tests)')
+
+%print values
+labels={'Early','Middle','Late','distance','categorization'};
+for i=1:5,fprintf('%s: %.4f +/- %.4f\n',labels{i},mean(D{i}),std(D{i}));end
+
+
+
+
+
+
+
 
 
 %% FIGURE 3 - NEURAL NETWORK GEOMETRY
@@ -455,10 +494,6 @@ sprintf('Early network layer categorical indices: mean = %0.2f, std = %0.2f', me
 sprintf('Middle network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnmid), std(nnmid))
 sprintf('Late network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnlate), std(nnlate))
 sprintf('Choice network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnchoice), std(nnchoice))
-
-
-%% FIGURE 4 - CORTICAL GEOMETRY
-
 
 
 
@@ -682,7 +717,6 @@ for sub = 1:numSubs
         %interp idexes
         low = min(interpSets{set}); high = max(interpSets{set});
         dists = RSMs{sub}(low:high,high) - RSMs{sub}(low:high,low);
-
         %plot unnormalized mlds
         figure(80), hold on, plot([1 6], [0 0], '--k'), xlim([0.5, 6.5])
         scatter(1:6, dists, [], colors(labels{sub}(set),:), 'filled', 'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'w')
@@ -976,6 +1010,7 @@ scatter(y, ynoise, 12, c, 'filled', 'markerFaceAlpha', 0.5, 'markerEdgeColor', '
 % %% Make the big plot
 % figure, hold on, xlim([0.5 4.5]), ylim([-0.1 1.1])
 % 
+
 % 
 % % Initialize storage
 % filtered_NNCatVals = cell(size(NNR2Vals,3), 4);
