@@ -452,6 +452,7 @@ getDistances(VVSRSMs, interpSets),
 
 
 %% SECTION 2 Task-dependent human perceptual geometry -- behavioral tests
+sprintf('One-sided t-tests:')
 sprintf('(Behavioral Data) MLDS Sigma Mean: %0.3f Sigma: %0.3f)', mean(m), std(m))
 sprintf('(Behavioral Data) Categorization Sigma Mean: %0.3f Sigma: %0.3f)',mean(c), std(c))
 [r p] = ttest(m,c,'tail','right');
@@ -470,7 +471,7 @@ figure;imagesc(-log10(P));colormap([.9 .9 .9;.6 .9 .6;.2 .7 .2;0 .5 0]);caxis([0
 xticks(1:5);xticklabels({'Early','Middle','Late','distance','categorization'});yticks(1:5);yticklabels({'Early','Middle','Late','distance','categorization'});
 for i=1:5,for j=1:5,if i~=j,text(j,i,num2str(P(i,j),'%.3f'),'HorizontalAlignment','center');end,end,end
 colorbar('Ticks',[.5 1.5 2.5 3.5],'TickLabels',{'ns','<.05','<.01','<.001'});
-title('Pairwise p-value (difference between categorical indices, 2-sided t tests)')
+title('Pairwise p-value (brain/behavior categorical indices)')
 
 %print values
 labels={'Early','Middle','Late','distance','categorization'};
@@ -489,16 +490,19 @@ figure; h=imagesc(-log10(P2)); colormap([.9 .9 .9;.6 .9 .6;.2 .7 .2;0 .5 0]); ca
 xticks(1:4); xticklabels(labels2); yticks(1:4); yticklabels(labels2);
 for i=1:4,for j=1:4,if i~=j,text(j,i,num2str(P2(i,j),'%.4f'),'HorizontalAlignment','center');end,end,end
 colorbar('Ticks',[.5 1.5 2.5 3.5],'TickLabels',{'ns','<.05','<.01','<.001'});
-title('Pairwise p-values');
+title('Pairwise p-values, behavior vs simulted (linking models)');
 for i=1:4,fprintf('%s: %.4f +/- %.4f\n',labels2{i},mean(D2{i}),std(D2{i}));end
 
 
 
 
-
-
-
 %% FIGURE 6 - NEURAL NETWORK GEOMETRY
+nnearly = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,1), 'UniformOutput', false));
+nnmid = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,2), 'UniformOutput', false));
+nnlate = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,3), 'UniformOutput', false));
+nnchoice = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,4), 'UniformOutput', false));
+
+
 D_rows={filtered_brainCatVals{1},filtered_brainCatVals{2},filtered_brainCatVals{3},filtered_mldsCatVals,filtered_catTaskCatVals};
 D_cols={nnearly,nnmid,nnlate,nnchoice};
 rlabels={'Brain early','Brain mid','Brain late','Distance','Categorization'};
@@ -509,7 +513,7 @@ figure;imagesc(-log10(P3));colormap([.9 .9 .9;.6 .9 .6;.2 .7 .2;0 .5 0]);caxis([
 xticks(1:4);xticklabels(clabels);yticks(1:5);yticklabels(rlabels);
 for i=1:5,for j=1:4,text(j,i,num2str(P3(i,j),'%.4f'),'HorizontalAlignment','center');end,end
 colorbar('Ticks',[.5 1.5 2.5 3.5],'TickLabels',{'ns','<.05','<.01','<.001'});
-title('Pairwise p-values: Brain/Behavioral vs NN layers');
+title('Pairwise p-values: Brain/Behavioral vs NN layers categorical indices');
 %values
 fprintf('\nRows:\n');
 for i=1:5,fprintf('%s: %.4f +/- %.4f\n',rlabels{i},mean(D_rows{i}),std(D_rows{i}));end
