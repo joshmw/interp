@@ -460,7 +460,7 @@ sprintf('1-tailed paired t-test between mlds and categorization behavior sigmas:
 sprintf('1-tailed paired t-test between mlds and linear (1.57) sigmas: %0.3i', p)
 
 
-% %% FIGURE 3 - CORTICAL GEOMETRY
+%% FIGURE 3 - CORTICAL GEOMETRY
 
 %plot pvalues as a matrix
 clear gca
@@ -474,9 +474,23 @@ title('Pairwise p-value (difference between categorical indices, 2-sided t tests
 
 %print values
 labels={'Early','Middle','Late','distance','categorization'};
+fprintf('COR')
 for i=1:5,fprintf('%s: %.4f +/- %.4f\n',labels{i},mean(D{i}),std(D{i}));end
 
 
+%% FIGURE 4 - Readout simulations
+[~,pcheck]=ttest2(m,mb); fprintf('Direct m vs mb: p=%.4f\n',pcheck);
+D2={m,c,mb,cb};
+labels2={'Distance','Categorization','Distance (brain)','Categorization (brain)'};
+P2=ones(4);
+for i=1:4,for j=i+1:4,[~,P2(i,j)]=ttest2(D2{i},D2{j});P2(j,i)=P2(i,j);end,end
+disp(array2table(P2,'VariableNames',{'Dist','Cat','DistBr','CatBr'},'RowNames',{'Dist','Cat','DistBr','CatBr'}));
+figure; h=imagesc(-log10(P2)); colormap([.9 .9 .9;.6 .9 .6;.2 .7 .2;0 .5 0]); caxis([0 4]);
+xticks(1:4); xticklabels(labels2); yticks(1:4); yticklabels(labels2);
+for i=1:4,for j=1:4,if i~=j,text(j,i,num2str(P2(i,j),'%.4f'),'HorizontalAlignment','center');end,end,end
+colorbar('Ticks',[.5 1.5 2.5 3.5],'TickLabels',{'ns','<.05','<.01','<.001'});
+title('Pairwise p-values');
+for i=1:4,fprintf('%s: %.4f +/- %.4f\n',labels2{i},mean(D2{i}),std(D2{i}));end
 
 
 
@@ -484,17 +498,23 @@ for i=1:5,fprintf('%s: %.4f +/- %.4f\n',labels{i},mean(D{i}),std(D{i}));end
 
 
 
-%% FIGURE 3 - NEURAL NETWORK GEOMETRY
-nnearly = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,1), 'UniformOutput', false));
-nnmid = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,2), 'UniformOutput', false));
-nnlate = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,3), 'UniformOutput', false));
-nnchoice = cell2mat(cellfun(@(x) x(:), filtered_NNCatVals(1:6,4), 'UniformOutput', false));
-
-sprintf('Early network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnearly), std(nnearly))
-sprintf('Middle network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnmid), std(nnmid))
-sprintf('Late network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnlate), std(nnlate))
-sprintf('Choice network layer categorical indices: mean = %0.2f, std = %0.2f', mean(nnchoice), std(nnchoice))
-
+%% FIGURE 6 - NEURAL NETWORK GEOMETRY
+D_rows={filtered_brainCatVals{1},filtered_brainCatVals{2},filtered_brainCatVals{3},filtered_mldsCatVals,filtered_catTaskCatVals};
+D_cols={nnearly,nnmid,nnlate,nnchoice};
+rlabels={'Brain early','Brain mid','Brain late','Distance','Categorization'};
+clabels={'NN early','NN mid','NN late','NN choice'};
+P3=ones(5,4);
+for i=1:5,for j=1:4,[~,P3(i,j)]=ttest2(D_rows{i},D_cols{j});end,end
+figure;imagesc(-log10(P3));colormap([.9 .9 .9;.6 .9 .6;.2 .7 .2;0 .5 0]);caxis([0 4]);
+xticks(1:4);xticklabels(clabels);yticks(1:5);yticklabels(rlabels);
+for i=1:5,for j=1:4,text(j,i,num2str(P3(i,j),'%.4f'),'HorizontalAlignment','center');end,end
+colorbar('Ticks',[.5 1.5 2.5 3.5],'TickLabels',{'ns','<.05','<.01','<.001'});
+title('Pairwise p-values: Brain/Behavioral vs NN layers');
+%values
+fprintf('\nRows:\n');
+for i=1:5,fprintf('%s: %.4f +/- %.4f\n',rlabels{i},mean(D_rows{i}),std(D_rows{i}));end
+fprintf('\nColumns:\n');
+for i=1:4,fprintf('%s: %.4f +/- %.4f\n',clabels{i},mean(D_cols{i}),std(D_cols{i}));end
 
 
 
