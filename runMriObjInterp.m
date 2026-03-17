@@ -354,7 +354,7 @@ end
 %%
 figure(96), hold on, xlim([0.5 4.5])
 behavioral_r2_cutoff = 0.8;
-
+ 
 m = []; mb = []; c = []; cb = []; 
 mMu= []; mbMu = []; cMu = []; cbMu = []; 
 usedColors = [];
